@@ -514,7 +514,8 @@
                 };
 
                 // 主要针对required必填或必选属性的验证
-                if (!element || element.disabled) {
+                if (!element ) {
+                    // if (!element || element.disabled) {
                     return objValidateState;
                 }
 
