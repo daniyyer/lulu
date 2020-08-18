@@ -15,8 +15,8 @@
         global.Validate = factory();
     }
 }((typeof global !== 'undefined') ? global
-: ((typeof window !== 'undefined') ? window
-    : ((typeof self !== 'undefined') ? self : this)), function (require) {
+    : ((typeof window !== 'undefined') ? window
+        : ((typeof self !== 'undefined') ? self : this)), function (require) {
 
     var ErrorTip = this.ErrorTip;
     if (typeof require == 'function' && !ErrorTip) {
@@ -478,6 +478,8 @@
                 } else if (objValidateState.customError) {
                     // 先看看有没有自定义的提示
                     strFinalText = optionPrompt.customError || defaultPrompt.customError;
+                }else if(objValidateState.remoteInValid){
+                    strFinalText=element.remoteResult
                 }
 
                 if (typeof strFinalText == 'function') {
@@ -485,6 +487,116 @@
                 }
 
                 return strFinalText;
+            },
+
+            // pendingCount:0,
+            // pending:{},
+            getRemoteValidation:function(element){
+                var remoteInValid=false;
+                if(element.customValidate.remoteUrl && element.customValidate.remoteQueryName && element.value){
+                    if(element.pending===undefined){
+                        remoteInValid=true;
+                        //request
+                        this.requestRemoteValidate(element,true);
+
+                    }else{
+                        if(element.pending){
+                            remoteInValid=true;
+
+                        }else{
+                            if(element.lastValue===element.value){
+                                remoteInValid=!(element.remoteResult === true);
+
+                            }else{
+                                remoteInValid=true;
+                                //request
+                                this.requestRemoteValidate(element);
+
+                            }
+                        }
+                    }
+                }
+                return {remoteInValid:remoteInValid};
+
+
+
+
+            },
+            requestRemoteValidate:function(element,submitTrigger){
+                element.pending=true;
+                // element.currentRequest= $.ajax({
+                //     url:element.customValidate.remoteUrl,
+                //     dataType: "json",
+                //     data:{[element.customValidate.remoteQueryName]:element.value} ,
+                //     beforeSend:function(){
+                //         if(element.currentRequest){
+                //             console.log('abort')
+                //             element.currentRequest.abort();
+                //         }
+                //     },
+                //     success:function(response){
+                //         var valid = response === true || response === "true",
+                //             errors, message, submitted;
+                //         if(valid){
+                //             element.remoteResult= true;
+                //         }else{
+                //             element.remoteResult=response;
+                //         }
+                //         element.pending=false;
+                //
+                //         if(submitTrigger){
+                //             element.customValidate.owner.element.form.dispatchEvent(new CustomEvent('submit'));
+                //
+                //         }else{
+                //             // create and dispatch the event
+                //             var event = new CustomEvent("formCheckValidity", {
+                //                 'bubbles'    : true, // Whether the event will bubble up through the DOM or not
+                //                 'cancelable' : true
+                //             });
+                //             element.customValidate.owner.element.form.dispatchEvent(event);
+                //         }
+                //     }
+                // });
+
+                if(element.currentXHR){
+                    element.currentXHR.abort();
+                }
+                element.currentXHR = new XMLHttpRequest();
+                element.currentXHR.onreadystatechange = function() {
+                    if (this.readyState == 4 ) {
+                        if(this.status == 200){
+                            var valid = this.response === true || this.response === "true",
+                                errors, message, submitted;
+                            if(valid){
+                                element.remoteResult= true;
+                            }else{
+                                element.remoteResult=this.response;
+                            }
+
+                        }else{
+                            //远程验证失败也认为验证通过，防止因为验证接口问题影响整个表单提交。
+                            element.remoteResult= true;
+                        }
+                        element.pending=false;
+
+                        if(submitTrigger){
+                            element.customValidate.owner.element.form.dispatchEvent(new CustomEvent('submit'));
+
+                        }else{
+                            // create and dispatch the event
+                            var event = new CustomEvent("formCheckValidity", {
+                                'bubbles'    : true, // Whether the event will bubble up through the DOM or not
+                                'cancelable' : true
+                            });
+                            element.customValidate.owner.element.form.dispatchEvent(event);
+                        }
+
+                    }
+                };
+
+                element.currentXHR.open("GET", element.customValidate.remoteUrl+'?'+element.customValidate.remoteQueryName+'='+element.value, true);
+                element.currentXHR.send();
+
             },
 
             /*
@@ -514,7 +626,8 @@
                 };
 
                 // 主要针对required必填或必选属性的验证
-                if (!element || element.disabled) {
+                if (!element ) {
+                    // if (!element || element.disabled) {
                     return objValidateState;
                 }
 
@@ -637,17 +750,17 @@
                 // 获取正则表达式，pattern属性获取优先，然后通过type类型匹配。
                 // 注意，不处理为空的情况
                 regex = regex || (function () {
-                    return element.getAttribute('pattern');
-                })() ||
-                (function () {
-                    // 文本框类型处理，可能有管道符——多类型重叠，如手机或邮箱
-                    return strType && strType.split('|').map(function (strTypeSplit) {
-                        var regMatch = document.validate.reg[strTypeSplit];
-                        if (regMatch) {
-                            return regMatch;
-                        }
-                    }).join('|');
-                })();
+                        return element.getAttribute('pattern');
+                    })() ||
+                    (function () {
+                        // 文本框类型处理，可能有管道符——多类型重叠，如手机或邮箱
+                        return strType && strType.split('|').map(function (strTypeSplit) {
+                            var regMatch = document.validate.reg[strTypeSplit];
+                            if (regMatch) {
+                                return regMatch;
+                            }
+                        }).join('|');
+                    })();
 
                 // 如果没有正则匹配的表达式，就没有验证的说法，认为出错为false
                 if (!regex) {
@@ -940,7 +1053,7 @@
                 // 如果值不变，且之前已经验证过，
                 // 且不是单复选框，则直接返回
                 // 避免同一元素短时间多次验证
-                if (element.lastValidateState && element.lastValue === element.value && /radio|checkbox/.test(element.type) == false) {
+                if (element.lastValidateState && element.lastValue === element.value && /radio|checkbox/.test(element.type) == false && !element.lastValidateState.remoteInValid) {
                     return element.lastValidateState;
                 }
 
@@ -962,6 +1075,7 @@
                 // 但是，不足以满足实际需求
                 objValidateState = Object.assign({}, objValidateState, this.getMissingState(element), this.getMismatchState(element), this.getRangeState(element), this.getLengthState(element), this.getCustomState(element));
 
+
                 var isSomeInvalid = false;
 
                 for (var keyValidate in objValidateState) {
@@ -969,6 +1083,13 @@
                         isSomeInvalid = true;
                     }
                 }
+                if(!isSomeInvalid){
+                    isSomeInvalid=this.getRemoteValidation(element).remoteInValid;
+                    objValidateState.remoteInValid=isSomeInvalid;
+                }
+
+
+
 
                 objValidateState.valid = !isSomeInvalid;
 
@@ -1058,13 +1179,16 @@
             errorTip: function (element, content) {
                 var eleTarget = this.getTarget(element);
 
-                if (!eleTarget || !content) {
+
+
+
+
+                if (!eleTarget || !content || element.pending) {
                     return this;
                 }
 
                 // 如果元素隐藏，也不提示
                 var objStyle = window.getComputedStyle(eleTarget);
-
                 if (objStyle.display == 'none' || objStyle.visibility == 'hidden') {
                     return this;
                 }
@@ -1141,7 +1265,7 @@
                         }
                     } else if (eleControl.focus && eleControl.select) {
                         eleControl.focus();
-                        eleControl.select();
+                        // eleControl.select();
                     }
                 };
 
@@ -1191,17 +1315,17 @@
                     eleTarget = element.parentElement.querySelector('label.ui-radio[for=' + strId + ']');
                 } else if (strType == 'checkbox' && objStyle.opacity != '1') {
                     eleTarget = element.parentElement.querySelector('label.ui-checkbox[for=' + strId + ']');
-                // 下拉框
+                    // 下拉框
                 } else if (strType == 'select' || strTag == 'select') {
                     if (objStyle.opacity != '1') {
                         eleTarget = element.nextElementSibling;
                     }
-                // range范围选择框
+                    // range范围选择框
                 } else if (strType == 'range') {
                     if (objStyle.display == 'none') {
                         eleTarget = element.nextElementSibling;
                     }
-                // 隐藏元素的目标提示元素的转移
+                    // 隐藏元素的目标提示元素的转移
                 } else if (strType == 'hidden' || objStyle.display == 'none' || objStyle.visibility == 'hidden') {
                     var eleTargetRel = document.getElementById(eleTarget.getAttribute('data-target')) || element.dataTarget;
                     if (eleTargetRel) {
@@ -1228,6 +1352,7 @@
             get: function ValidityState () {
                 return document.validate.getValidity(this);
             },
+
             configurable: true
         });
 
@@ -1327,30 +1452,65 @@
             label: true,
             // 自定义验证提示与数据
             validate: [
-            // 下面为结构示意
-            /*{
-                id: '',
-                report: {
-                    // 源自规范，详见：https://www.zhangxinxu.com/wordpress/?p=8895
-                    badInput: '该错误类型对应的提示'
-                    customError: '该错误类型对应的提示'
-                    patternMismatch: '该错误类型对应的提示'
-                    rangeOverflow: '该错误类型对应的提示'
-                    rangeUnderflow: '该错误类型对应的提示'
-                    stepMismatch: '该错误类型对应的提示'
-                    tooLong: '该错误类型对应的提示'
-                    tooShort: '该错误类型对应的提示'
-                    typeMismatch: '该错误类型对应的提示'
-                    valueMissing: '该错误类型对应的提示'
-                },
-                method: function () {}
-            }*/
+                // 下面为结构示意
+                /*{
+                    id: '',
+                    report: {
+                        // 源自规范，详见：https://www.zhangxinxu.com/wordpress/?p=8895
+                        badInput: '该错误类型对应的提示'
+                        customError: '该错误类型对应的提示'
+                        patternMismatch: '该错误类型对应的提示'
+                        rangeOverflow: '该错误类型对应的提示'
+                        rangeUnderflow: '该错误类型对应的提示'
+                        stepMismatch: '该错误类型对应的提示'
+                        tooLong: '该错误类型对应的提示'
+                        tooShort: '该错误类型对应的提示'
+                        typeMismatch: '该错误类型对应的提示'
+                        valueMissing: '该错误类型对应的提示'
+                    },
+                    method: function () {},
+                    remoteUrl:""//远程验证的地址
+                    remoteQueryName:""//远程验证的属性名称
+                }*/
             ],
             onError: function () {},
             onSuccess: function () {}
         };
 
-        var objParams = Object.assign({}, defaults, options || {});
+        // //data属性
+        eleForm.querySelectorAll('input, select, textarea').forEach(function (eleInput) {
+            var validateOption={};
+            if(eleInput.getAttribute('data-remote-url')){
+                validateOption.remoteUrl=eleInput.getAttribute('data-remote-url');
+            };
+            if(eleInput.getAttribute('data-remote-queryname')){
+                validateOption.remoteQueryName=eleInput.getAttribute('data-remote-queryname');
+            };
+            if(eleInput.getAttribute('id')){
+                validateOption.id=eleInput.getAttribute('id');
+            };
+            if(validateOption.id && validateOption.remoteUrl && validateOption.remoteQueryName){
+                let exist=false;
+                for(let i=0;i<options.validate.length;i++){
+                    if(options.validate[i].id===validateOption.id){
+                        exist=true;
+                        options.validate[i].remoteUrl=validateOption.remoteUrl;
+                        options.validate[i].remoteQueryName=validateOption.remoteQueryName;
+                        break;
+                    }
+                }
+                if(!exist){
+                    if(!options.validate){
+                        options.validate=[];
+                    }
+                    options.validate.push(validateOption)
+                }
+            }
+        });
+
+
+        var objParams = Object.assign({}, defaults, options || {},);
+        // console.log(objParams)
 
         // 还原禁用的提交和关闭按钮
         eleForm.querySelectorAll('[type="submit"]:disabled, [type="image"]:disabled').forEach(function (eleSubmit) {
@@ -1370,6 +1530,13 @@
 
             return false;
         }.bind(this));
+
+        //触发验证
+        eleForm.addEventListener("formCheckValidity", function (event) {
+            this.checkValidity();
+        }.bind(this));
+
+
 
         // 自定义的验证绑定
         var dataValidate = objParams.validate;
@@ -1611,6 +1778,8 @@
 
                         // 触发input事件
                         element.dispatchEvent(new CustomEvent('input'));
+
+
                     });
                 }
             });
@@ -1696,6 +1865,7 @@
      * @return {Boolean} 是否表单所有元素验证通过
      */
     Validate.prototype.checkValidity = function () {
+        // console.log('check')
         var eleForm = this.element.form;
 
         var isAllPass = true;
@@ -1712,6 +1882,9 @@
                     this.reportValidity(element);
                     isAllPass = false;
                 }
+                // else if(!element.lastValidateState.remoteInValid){
+                //     this.reportValidity(element);
+                // }
                 // 回调触发
                 this.callback[isPass ? 'success' : 'error'].call(this, element);
             }
