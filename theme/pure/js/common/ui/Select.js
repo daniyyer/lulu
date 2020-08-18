@@ -52,7 +52,7 @@
         if (!element) {
             return this;
         }
-
+        if (!element.classList.contains("lulu-select")) return;
         var eleSelect = element;
 
         // 避免重复初始化
@@ -548,7 +548,7 @@
         if (window.autoInit === false) {
             return;
         }
-        document.querySelectorAll('select').forEach(function (eleSelect) {
+        document.querySelectorAll(".lulu-select").forEach(function (eleSelect) {
             if (window.getComputedStyle(eleSelect).opacity != '1') {
                 eleSelect.refresh();
             }
@@ -592,7 +592,7 @@
                 // 但没有必要，因此，阻止
                 funAutoInitAndWatching.flag = false;
                 // 只是Select初始化
-                node.querySelectorAll('select').forEach(function (element) {
+                node.querySelectorAll('.lulu-select').forEach(function (element) {
                     funSyncRefresh(element, action);
                 });
                 // 恢复到正常检测
