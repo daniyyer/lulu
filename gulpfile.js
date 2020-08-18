@@ -1,11 +1,11 @@
 var gulp = require('gulp');
-var sass = require('gulp-sass');
+var sass = require('gulp-dart-sass');
 //清空文件
 var clean = require('gulp-clean');
 var concat = require('gulp-concat');
 
 // 或者之前的modern
-var theme = 'peak';
+var theme = 'pure';
 
 var path = {
     'sass': './theme/' + theme + '/sass',
@@ -26,10 +26,16 @@ fileCompJs.forEach(function (filename) {
 });
 
 // 清空CSS
-gulp.task('clean', function() {
-    gulp.src([path.css + '/**/*.css'], {read: false})
-        .pipe(clean());
-});
+// pure主题没有sass，不要清空
+
+    gulp.task('clean', function() {
+        if(theme!=='pure') {
+            gulp.src([path.css + '/**/*.css'], {read: false})
+                .pipe(clean());
+        }
+    });
+
+
 
 // 默认任务
 gulp.task('default', ['clean', 'sass:ui', 'sass:common', 'sass:comp', 'concat:js'], function () {

@@ -483,6 +483,7 @@
 
     return {};
 }));
+
 /**
  * @Follow.js
  * @author zhangxinxu
@@ -877,6 +878,7 @@
 
     return Follow;
 }));
+
 /**
  * @Tab.js
  * @author zhangxinxu
@@ -1153,697 +1155,7 @@
 
     return Tab;
 }));
-/**
- * @Select.js
- * @author zhangxinxu
- * @version
- * @Created: 15-06-18
- * @edit:    07-06-15  rewrite
- * @edit:    09-08-28  native js rewrite
-**/
 
-(function (global, factory) {
-    if (typeof exports === 'object' && typeof module !== 'undefined') {
-        module.exports = factory();
-    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
-        define(factory);
-    } else {
-        global.Select = factory();
-    }
-}((typeof global !== 'undefined') ? global
-: ((typeof window !== 'undefined') ? window
-    : ((typeof self !== 'undefined') ? self : this)), function () {
-
-    /**
-     * 模拟下拉框效果
-     * 针对所有浏览器进行处理
-     * 基于原生的<select>元素生成
-     *
-     */
-
-    // 常量变量
-    var SELECT = 'select';
-    var SELECTED = 'selected';
-    var DISABLED = 'disabled';
-    var ACTIVE = 'active';
-    var REVERSE = 'reverse';
-    var MULTIPLE = 'multiple';
-
-    // 样式类名统一处理
-    var CL = {
-        add: function () {
-            return ['ui', SELECT].concat([].slice.call(arguments)).join('-');
-        },
-        toString: function () {
-            return 'ui-' + SELECT;
-        }
-    };
-
-    /**
-     * 基于原生下拉框生成的下拉组件
-     * @param {Object} element 原生select元素
-     */
-    var Select = function (element) {
-        if (!element) {
-            return this;
-        }
-
-        var eleSelect = element;
-
-        // 避免重复初始化
-        if (eleSelect.data && eleSelect.data.select) {
-            return;
-        }
-
-        var strAttrWidth = eleSelect.style.width || eleSelect.getAttribute('width');
-        if (!strAttrWidth) {
-            strAttrWidth = eleSelect.offsetWidth;
-        }
-        this.offsetWidth = strAttrWidth;
-
-        // 构造元素
-        // 1. 得到关联id
-        var strId = eleSelect.id;
-        if (!strId) {
-            strId = ('lulu_' + Math.random()).replace('0.', '');
-        } else {
-            strId = 'lulu_' + strId;
-        }
-        this.id = strId;
-
-        // 2. 是否多选
-        var isMultiple = (typeof eleSelect.getAttribute(MULTIPLE) == 'string');
-        this.multiple = isMultiple;
-
-        // 3. 创建下拉组合框元素
-        var eleCombobox = document.createElement('div');
-        eleCombobox.setAttribute('role', 'combobox');
-
-        // 4. 创建下拉点击按钮元素
-        var eleButton = document.createElement('a');
-        if (!eleSelect[DISABLED]) {
-            eleButton.setAttribute('href', 'javascript:');
-        }
-        eleButton.setAttribute('data-target', strId);
-        // 下面3个aria无障碍访问需要
-        eleButton.setAttribute('role', 'button');
-        eleButton.setAttribute('aria-expanded', 'false');
-        eleButton.setAttribute('aria-owns', strId);
-        // 样式类名
-        eleButton.classList.add(CL.add('button'));
-
-        // 5. 创建下拉列表元素
-        var eleDatalist = document.createElement('div');
-        eleDatalist.id = strId;
-        eleDatalist.setAttribute('role', 'listbox');
-        eleDatalist.setAttribute('aria-expanded', 'true');
-        eleDatalist.classList.add(CL.add('datalist'));
-
-        // 6. 元素组装
-        // multiple没有button
-        if (isMultiple == false) {
-            eleCombobox.appendChild(eleButton);
-            eleCombobox.appendChild(eleDatalist);
-            // 插入到下拉框的后面
-            eleSelect.style.display = 'none';
-            eleSelect.insertAdjacentElement('afterend', eleCombobox);
-        } else {
-            eleCombobox.appendChild(eleDatalist);
-            // 绝对定位隐藏，以便可以响应键盘focus
-            eleSelect.style.position = 'absolute';
-            eleSelect.style.zIndex = 1;
-            eleSelect.insertAdjacentElement('afterend', eleCombobox);
-            // 视觉列表不参与设置为不可访问
-            eleDatalist.setAttribute('aria-hidden', 'true');
-        }
-        // 暴露给其他方法
-        this.element = {
-            select: eleSelect,
-            combobox: eleCombobox,
-            button: eleButton,
-            datalist: eleDatalist
-        };
-
-        // 刷新内容
-        this.refresh();
-
-        // 事件绑定
-        this.events();
-
-        // 存储
-        if (!eleSelect.data) {
-            eleSelect.data = {
-                select: this
-            };
-        } else {
-            eleSelect.data.select = this;
-        }
-    };
-
-    /**
-     * 下拉相关的事件处理
-     * @return {[type]} [description]
-     */
-    Select.prototype.events = function () {
-        // 各个元素
-        var objElement = this.element;
-        // 主要的几个元素
-        var eleSelect = objElement.select;
-        var eleCombobox = objElement.combobox;
-        var eleButton = objElement.button;
-        var eleDatalist = objElement.datalist;
-
-        // 单选下拉框的事件
-        if (this.multiple == false) {
-            // 点击页面空白要隐藏
-            // 测试表明，这里优化下可以提高40~50%性能
-            // 原本是绑定对应元素上，现在改成委托
-            if (!document.isSelectMouseEvent) {
-                document.addEventListener('click', function (event) {
-                    var target = event.target;
-
-                    if (!target || !target.closest) {
-                        return;
-                    }
-
-                    // 获取下拉元素是关键，因为存储了实例对象
-                    // 元素什么的都可以直接匹配
-                    eleCombobox = target.closest('.' + CL);
-                    eleSelect = eleCombobox && eleCombobox.previousElementSibling;
-
-                    if (!eleSelect || !eleSelect.data || !eleSelect.data.select) {
-                        return;
-                    }
-
-                    // 按钮和列表元素就知道了
-                    objElement = eleSelect.data.select.element;
-
-                    eleButton = objElement.button;
-                    eleDatalist = objElement.datalist;
-
-                    // 下面判断点击的是按钮还是列表了
-                    if (eleButton.contains(target)) {
-                        if (eleSelect[DISABLED]) {
-                            return false;
-                        }
-
-                        // 显示与隐藏
-                        eleCombobox.classList.toggle(ACTIVE);
-
-                        if (eleCombobox.classList.contains(ACTIVE)) {
-                            // 边界判断
-                            var isOverflow = eleDatalist.getBoundingClientRect().bottom + window.pageYOffset > Math.max(document.body.clientHeight, window.innerHeight);
-                            eleCombobox.classList[isOverflow ? 'add' : 'remove'](REVERSE);
-                            // aria状态
-                            eleButton.setAttribute('aria-expanded', 'true');
-
-                            // 滚动与定位
-                            var arrDataScrollTop = eleCombobox.dataScrollTop;
-                            var eleDatalistSelected = eleDatalist.querySelector('.' + SELECTED);
-                            // 严格验证
-                            if (arrDataScrollTop && arrDataScrollTop[1] == eleDatalistSelected.getAttribute('data-index') && arrDataScrollTop[2] == eleDatalistSelected.innerText) {
-                                eleDatalist.scrollTop = arrDataScrollTop[0];
-                                // 重置
-                                delete eleCombobox.dataScrollTop;
-                            }
-                        } else {
-                            eleCombobox.classList.remove(REVERSE);
-                            // aria状态
-                            eleButton.setAttribute('aria-expanded', 'false');
-                        }
-                    } else if (eleDatalist.contains(target)) {
-                        // 点击的列表元素
-                        var eleList = target;
-                        // 对应的下拉<option>元素
-                        var eleOption = null;
-                        // 是否当前点击列表禁用
-                        var isDisabled = eleList.classList.contains(DISABLED);
-                        // 获取索引
-                        var indexOption = eleList.getAttribute('data-index');
-                        // 存储可能的滚动定位需要的数据
-                        var scrollTop = eleDatalist.scrollTop;
-                        eleCombobox.dataScrollTop = [scrollTop, indexOption, eleList.innerText];
-
-                        // 修改下拉选中项
-                        if (isDisabled == false) {
-                            eleOption = eleSelect[indexOption];
-                            if (eleOption) {
-                                eleOption[SELECTED] = true;
-                            }
-                        }
-                        // 下拉收起
-                        eleCombobox.classList.remove(ACTIVE);
-                        eleButton.setAttribute('aria-expanded', 'false');
-                        // focus
-                        eleButton.focus();
-                        eleButton.blur();
-
-                        if (isDisabled == false) {
-                            // 更新下拉框
-                            eleSelect.refresh();
-                            // 回调处理
-                            // 触发change事件
-                            eleSelect.dispatchEvent(new CustomEvent('change', {
-                                'bubbles': true
-                            }));
-                        }
-                    }
-                });
-
-                document.addEventListener('mouseup', function (event) {
-                    var target = event.target;
-                    if (!target) {
-                        return;
-                    }
-                    // 识别此时的combobox
-                    eleCombobox = document.querySelector(SELECT + '+.' + CL + '.' + ACTIVE);
-
-                    if (eleCombobox && eleCombobox.contains(target) == false) {
-                        eleCombobox.classList.remove(ACTIVE);
-                        eleCombobox.classList.remove(REVERSE);
-                    }
-                });
-
-                document.isSelectMouseEvent = true;
-            }
-
-            // disabled状态变化与键盘访问
-            var funSyncDisabled = function () {
-                if (eleSelect[DISABLED]) {
-                    eleButton.removeAttribute('href');
-                } else {
-                    eleButton.href = 'javascript:';
-                }
-            };
-            // 禁用状态变化检测
-            if (window.MutationObserver) {
-                var observerSelect = new MutationObserver(function (mutationsList) {
-                    mutationsList.forEach(function (mutation) {
-                        if (mutation.type == 'attributes') {
-                            funSyncDisabled();
-                        }
-                    });
-                });
-
-                observerSelect.observe(eleSelect, {
-                    attributes: true,
-                    attributeFilter: [DISABLED]
-                });
-            } else {
-                eleSelect.addEventListener('DOMAttrModified', function (event) {
-                    if (event.attrName == DISABLED) {
-                        funSyncDisabled();
-                    }
-                });
-            }
-        } else {
-            // 下拉多选
-            // 键盘交互UI同步
-            eleSelect.addEventListener('change', function () {
-                // 更新下拉框
-                this.refresh();
-            }.bind(this));
-            // 滚动同步
-            eleSelect.addEventListener('scroll', function () {
-                eleDatalist.scrollTop = eleSelect.scrollTop;
-            });
-            // hover穿透
-            eleSelect.addEventListener('mousedown', function () {
-                eleSelect.setAttribute('data-active', 'true');
-            });
-            eleSelect.addEventListener('mousemove', function (event) {
-                if (eleSelect.getAttribute('data-active')) {
-                    this.refresh();
-
-                    return;
-                }
-                var clientY = event.clientY;
-                // 当前坐标元素
-                // 最好方法是使用
-                // document.elementsFromPoint
-                // IE10+是document.msElementFromPoint
-                // 但IE8, IE9浏览器并不支持
-                // 所以这里采用其他方法实现
-                // 判断列表的y位置和clientY做比较
-                var eleListAll = eleDatalist.querySelectorAll('a');
-                for (var indexList = 0; indexList < eleListAll.length; indexList++) {
-                    var eleList = eleListAll[indexList];
-                    // hover状态先还原
-                    eleList.removeAttribute('href');
-                    // 然后开始寻找匹配的列表元素
-                    // 进行比对
-                    var beginY = eleList.getBoundingClientRect().top;
-                    var endY = beginY + eleList.clientHeight;
-                    // 如果在区间范围
-                    if (clientY >= beginY && clientY <= endY) {
-                        if (eleList.classList.contains(SELECTED) == false && eleList.classList.contains(DISABLED) == false) {
-                            eleList.href = 'javascript:';
-                        }
-                        // 退出循环
-                        // forEach无法中断，因此这里使用了for循环
-                        break;
-                    }
-                }
-            }.bind(this));
-
-            eleSelect.addEventListener('mouseout', function () {
-                var eleListAllWithHref = eleDatalist.querySelectorAll('a[href]');
-                eleListAllWithHref.forEach(function (eleList) {
-                    eleList.removeAttribute('href');
-                });
-            });
-
-            document.addEventListener('mouseup', function () {
-                eleSelect.removeAttribute('data-active');
-            });
-        }
-    };
-
-    /**
-     * 把下拉元素变成数据，格式为：
-     * [{
-        html: '选项1',
-        value: '1',
-        selected: false,
-        className: 'a'
-     }, {
-        html: '选项2',
-        value: '2',
-        selected: true,
-        className: 'b'
-     }]
-    * @return 数组
-    */
-    Select.prototype.getData = function () {
-        var eleSelect = this.element.select;
-
-        var eleOptions = eleSelect.querySelectorAll('option');
-
-        if (eleOptions.length == 0) {
-            return [{
-                html: ''
-            }];
-        }
-
-        return [].slice.call(eleOptions).map(function (option) {
-            return {
-                html: option.innerHTML,
-                value: option.value,
-                selected: option.selected,
-                disabled: option.disabled,
-                className: option.className
-            };
-        });
-    };
-
-    /**
-     * 下拉刷新方法
-     * @param  {Array} data 根据数组数据显示下拉内容
-     * @return {Object}     返回当前实例对象
-     */
-    Select.prototype.refresh = function (data) {
-        // 实例id
-        var id = this.id;
-        // 是否多选
-        var isMultiple = this.multiple;
-        // 各个元素
-        var objElement = this.element;
-        // 主要的几个元素
-        var eleSelect = objElement.select;
-        var eleCombobox = objElement.combobox;
-        var eleButton = objElement.button;
-        var eleDatalist = objElement.datalist;
-
-        // 获取当下下拉框的数据和状态
-        data = data || this.getData();
-
-        // 下拉组合框元素的UI和尺寸
-        eleCombobox.className = (eleSelect.className + ' ' + CL).trim();
-
-        // offsetWidth/clientWidth/getBoundingClientRect在下拉元素很多的的时候会有明显的性能问题
-        // 因此宽度已知的时候，使用定值，否则实时获取
-        var strAttrWidth = this.offsetWidth;
-
-        if (/\D$/.test(strAttrWidth)) {
-            // 如果是<length>
-            eleCombobox.style.width = strAttrWidth;
-        } else {
-            // 如果是<number>
-            eleCombobox.style.width = strAttrWidth + 'px';
-        }
-
-        // 多选，高度需要同步，因为选项高度不确定
-        if (isMultiple) {
-            eleCombobox.style.height = eleSelect.style.height || (eleSelect.offsetHeight + 'px');
-        } else {
-            // 按钮元素中的文案
-            eleButton.innerHTML = '<span class="' + CL.add('text') + '">' + (function () {
-                var htmlSelected = '';
-
-                data.forEach(function (obj) {
-                    if (obj.selected) {
-                        htmlSelected = obj.html;
-                    }
-                });
-
-                return htmlSelected || data[0].html;
-            })() + '</span><i class="' + CL.add('icon') + '" aria-hidden="true"></i>';
-        }
-
-        // 列表内容的刷新
-        eleDatalist.innerHTML = data.map(function (obj, index) {
-            var arrCl = [CL.add('datalist', 'li'), obj.className];
-
-            if (obj[SELECTED]) {
-                arrCl.push(SELECTED);
-            }
-            if (obj[DISABLED]) {
-                arrCl.push(DISABLED);
-            }
-
-            // 复选模式列表不参与无障碍访问识别，因此HTML相对简单
-            if (isMultiple) {
-                return '<a class="' + arrCl.join(' ') + '" data-index=' + index + '>' + obj.html + '</a>';
-            }
-
-            return '<a ' + (obj[DISABLED] ? '' : 'href="javascript:" ') + 'class="' + arrCl.join(' ') + '" data-index=' + index + ' data-target="' + id + '" role="option" aria-selected="' + obj[SELECTED] + '">' + obj.html + '</a>';
-        }).join('');
-
-        return this;
-    };
-
-    /**
-     * 删除方法
-     * @return {[type]} [description]
-     */
-    Select.prototype.remove = function () {
-        // 主元素
-        var eleCombobox = this.element.combobox;
-
-        if (eleCombobox) {
-            eleCombobox.remove();
-        }
-    };
-
-    // 重新定义select元素的value方法
-    Object.defineProperty(HTMLSelectElement.prototype, 'value', {
-        configurable: true,
-        enumerable: true,
-        writeable: true,
-        get: function () {
-            var arrValue = [];
-            this.querySelectorAll('option').forEach(function (eleOption) {
-                if (eleOption[SELECTED] == true) {
-                    arrValue.push(eleOption.value);
-                }
-            });
-
-            return arrValue.join();
-        },
-        set: function (value) {
-            var isOptionMatch = false;
-            // 是否多选框
-            var isMultiple = (typeof this.getAttribute('multiple') == 'string');
-            if (isMultiple) {
-                value = value.split(',');
-            } else {
-                value = [value.toString()];
-            }
-
-            this.querySelectorAll('option').forEach(function (eleOption) {
-                // 单选框模式下，如果多个值匹配，让第一个选中
-                // 如果没有下面这句，会最后一个匹配的选中
-                if (isMultiple == false && isOptionMatch == true) {
-                    return;
-                }
-                if (value.indexOf(eleOption.value) != -1) {
-                    eleOption[SELECTED] = isOptionMatch = true;
-                } else if (isMultiple) {
-                    eleOption[SELECTED] = false;
-                }
-            });
-
-            // 如果包含匹配的值，则重新刷新
-            if (isOptionMatch == true) {
-                this.refresh();
-            }
-        }
-    });
-
-    HTMLSelectElement.prototype.refresh = function () {
-        if (this.data && this.data.select) {
-            this.data.select.refresh();
-        } else {
-            new Select(this);
-        }
-    };
-
-    var funAutoInitAndWatching = function () {
-        // 如果没有开启自动初始化，则返回
-        if (window.autoInit === false) {
-            return;
-        }
-        document.querySelectorAll('select').forEach(function (eleSelect) {
-            if (window.getComputedStyle(eleSelect).opacity != '1') {
-                eleSelect.refresh();
-            }
-        });
-
-        // 如果没有开启观察，不监听DOM变化
-        if (window.watching === false) {
-            return;
-        }
-
-        var funSyncRefresh = function (node, action) {
-            if (node.nodeType != 1) {
-                return;
-            }
-
-            if (node.tagName == 'SELECT') {
-                if (action == 'remove') {
-                    if (node.data && node.data.select) {
-                        node.data.select[action]();
-                    } else {
-                        node.parentNode.removeChild(node);
-                    }
-                } else {
-                    node[action]();
-                }
-            } else if (node.tagName == 'OPTION') {
-                var eleSelect = node.parentElement;
-
-                if (!eleSelect) {
-                    // 可以认为是观察者模式的删除
-                    if (this.target && this.target.tagName == 'SELECT') {
-                        this.target.refresh();
-                    }
-                } else if (eleSelect.data && eleSelect.data.select) {
-                    setTimeout(function () {
-                        eleSelect.refresh();
-                    }, 16);
-                }
-            } else if (action == 'refresh') {
-                // 此时Select初始化也会触发DOM检测
-                // 但没有必要，因此，阻止
-                funAutoInitAndWatching.flag = false;
-                // 只是Select初始化
-                node.querySelectorAll('select').forEach(function (element) {
-                    funSyncRefresh(element, action);
-                });
-                // 恢复到正常检测
-                funAutoInitAndWatching.flag = true;
-            }
-        };
-
-        // DOM Insert自动初始化
-        // IE11+使用MutationObserver
-        // IE9-IE10使用Mutation Events
-        if (window.MutationObserver) {
-            var observerSelect = new MutationObserver(function (mutationsList) {
-                // 此时不检测DOM变化
-                if (funAutoInitAndWatching.flag === false || window.watching === false) {
-                    return;
-                }
-                mutationsList.forEach(function (mutation) {
-                    var nodeAdded = mutation.addedNodes;
-                    var nodeRemoved = mutation.removedNodes;
-
-                    if (nodeAdded.length) {
-                        nodeAdded.forEach(function (eleAdd) {
-                            funSyncRefresh.call(mutation, eleAdd, 'refresh');
-                        });
-                    }
-                    if (nodeRemoved.length) {
-                        nodeRemoved.forEach(function (eleRemove) {
-                            funSyncRefresh.call(mutation, eleRemove, 'remove');
-                        });
-                    }
-                });
-            });
-
-            observerSelect.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-        } else {
-            // IE9-IE10优化处理
-            // 借助定时器先观察，再统一处理
-            var arrMutationsList = [];
-            var timerRenderList = null;
-
-            var funMutationObserver = function (target, action, event) {
-                // 此时不检测DOM变化
-                if (funAutoInitAndWatching.flag === false || window.watching === false || target.nodeType != 1) {
-                    return;
-                }
-
-                clearTimeout(timerRenderList);
-
-                if (target.tagName == 'SELECT') {
-                    arrMutationsList.push({
-                        action: action,
-                        node: target
-                    });
-                } else if (target.tagName == 'OPTION' && (arrMutationsList.length == 0 || arrMutationsList[arrMutationsList.length - 1].node.contains(target) == false)) {
-                    arrMutationsList.push({
-                        action: 'refresh',
-                        node: event.relatedNode || target
-                    });
-                }
-
-                // 定时器处理
-                timerRenderList = setTimeout(function () {
-                    funAutoInitAndWatching.flag = false;
-
-                    arrMutationsList.forEach(function (objList) {
-                        // 插入节点
-                        funSyncRefresh(objList.node, objList.action);
-                    });
-
-                    funAutoInitAndWatching.flag = true;
-
-                    arrMutationsList = [];
-                }, 16);
-            };
-
-            document.body.addEventListener('DOMNodeInserted', function (event) {
-                funMutationObserver(event.target, 'refresh', event);
-            });
-            document.body.addEventListener('DOMNodeRemoved', function (event) {
-                // relatedNode
-                funMutationObserver(event.target, 'remove', event);
-            });
-        }
-    };
-
-    if (document.readyState != 'loading') {
-        funAutoInitAndWatching();
-    } else {
-        window.addEventListener('DOMContentLoaded', funAutoInitAndWatching);
-    }
-
-    return Select;
-}));
 /**
  * @Drop.js
  * @author zhangxinxu
@@ -2859,6 +2171,7 @@
 
     return Drop;
 }));
+
 /**
  * @Tips.js
  * @author zhangxinxu
@@ -3263,6 +2576,7 @@
     return Tips;
 }));
 
+
 /**
  * @LightTip.js
  * @author zhangxinxu
@@ -3601,6 +2915,7 @@
 
     return LightTip;
 }));
+
 /**
  * @ErrorTip.js
  * @author zhangxinxu
@@ -3843,6 +3158,7 @@
 
     return ErrorTip;
 }));
+
 /**
  * @Loading.js
  * @author zhangxinxu
@@ -4092,1679 +3408,7 @@
 
     return Loading;
 }));
-/**
- * @Range.js
- * @author zhangxinxu
- * @version
- * @created: 15-07-20
- * @edit:    19-09-24 remove jQuery by 5ibinbin
- * @review:  19-09-27 by zhangxinxu
- */
 
-(function (global, factory) {
-    if (typeof exports === 'object' && typeof module !== 'undefined') {
-        global.Tips = require('./Tips');
-        module.exports = factory();
-    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
-        define(factory);
-    } else {
-        global.Range = factory();
-    }
-}((typeof global !== 'undefined') ? global
-    : ((typeof window !== 'undefined') ? window
-        : ((typeof self !== 'undefined') ? self : this)), function (require) {
-    var Tips = this.Tips;
-    if (typeof require === 'function' && !Tips) {
-        Tips = require('common/ui/Tips');
-    } else if (!Tips) {
-        window.console.error('need Tips.js');
-        return {};
-    }
-
-    /**
-     * 基于HTML原生range范围选择框的模拟选择框效果
-     * 兼容IE9+
-     * min/max/step
-     */
-    // 状态类名
-    var REVERSE = 'reverse';
-    var ACTIVE = 'active';
-    var DISABLED = 'disabled';
-
-    // 样式类名统一处理
-    var CL = {
-        add: function () {
-            return ['ui', 'range'].concat([].slice.call(arguments)).join('-');
-        },
-        toString: function () {
-            return 'ui-range';
-        }
-    };
-
-    var objEventType = {
-        start: 'mousedown',
-        move: 'mousemove',
-        end: 'mouseup'
-    };
-    if ('ontouchstart' in document) {
-        objEventType = {
-            start: 'touchstart',
-            move: 'touchmove',
-            end: 'touchend'
-        };
-    }
-
-    /**
-     * range滑块效果
-     * @param {Object} element 原生的type为range的input元素
-     * @param {Object} options 可选参数
-     */
-    var Range = function (element, options) {
-        var defaults = {
-            reverse: false,
-            tips: function (value) {
-                return value;
-            }
-        };
-
-        options = options || {};
-
-        // 参数合并
-        var objParams = Object.assign({}, defaults, options);
-
-        // 获取<range>元素
-        var eleRange = element;
-        if (typeof element == 'string') {
-            eleRange = document.querySelector(element);
-        }
-
-        if (!eleRange) {
-            return this;
-        }
-
-        if (eleRange.data && eleRange.data.range) {
-            return eleRange.data.range;
-        }
-
-        // 一些属性值获取
-        var numMin = eleRange.getAttribute('min') || 0;
-        var numMax = eleRange.getAttribute('max') || 100;
-        var numStep = eleRange.getAttribute('step') || 1;
-
-        // 一些元素的创建
-        var eleContainer = document.createElement('div');
-        var eleRangeClass = eleRange.className;
-        eleContainer.setAttribute('class', eleRangeClass);
-        eleContainer.classList.add(CL);
-
-        // 轨道元素
-        var eleTrack = document.createElement('div');
-        eleTrack.classList.add(CL.add('track'));
-
-        // 中间的圈圈
-        var eleThumb = document.createElement('a');
-        eleThumb.setAttribute('href', 'javascript:');
-        eleThumb.setAttribute('aria-valuenow', eleRange.value);
-        eleThumb.setAttribute('aria-valuemax', numMax);
-        eleThumb.setAttribute('aria-valuemin', numMin);
-        eleThumb.setAttribute('role', 'slider');
-        eleThumb.setAttribute('draggable', 'false');
-        eleThumb.classList.add(CL.add('thumb'));
-
-        // 是否反向
-        if (objParams.reverse || eleRange.classList.contains(REVERSE)) {
-            objParams.reverse = true;
-            eleThumb.classList.add(REVERSE);
-        }
-
-        // tips提示Function
-        var strTips = eleRange.getAttribute('data-tips');
-        if (strTips && !options.tips) {
-            if (strTips == 'null') {
-                objParams.tips = null;
-            } else {
-                objParams.tips = function (value) {
-                    return strTips.replace('${value}', value);
-                };
-            }
-        }
-
-        // 前置插入
-        eleRange.insertAdjacentElement('afterend', eleContainer);
-        // 如果元素没宽度，则使用el计算的宽度
-        if (eleRange.getAttribute('width') != '100%' && eleRange.parentElement.classList.contains(CL.add('input')) == false) {
-            eleContainer.style.width = window.getComputedStyle(eleRange).width;
-        } else {
-            eleContainer.style.display = 'block';
-        }
-        eleContainer.style.height = window.getComputedStyle(eleRange).height;
-
-        eleRange.style.display = 'none';
-
-        // 组装
-        eleTrack.appendChild(eleThumb);
-        eleContainer.appendChild(eleTrack);
-
-        // 全局变量
-        this.number = {
-            min: +numMin,
-            max: +numMax,
-            step: +numStep
-        };
-        // 暴露给其他方法
-        this.element = {
-            input: eleRange,
-            container: eleContainer,
-            track: eleTrack,
-            thumb: eleThumb
-        };
-        this.params = objParams;
-        // 初始化
-        this.value();
-        // 事件
-        this.event();
-
-        // 禁用态
-        if (eleRange[DISABLED] == true) {
-            this.disabled = true;
-        }
-
-        // 实例自身通过DOM元素暴露
-        if (!eleRange.data) {
-            eleRange.data = {};
-        }
-
-        eleRange.data.range = this;
-
-        return this;
-    };
-
-    /**
-     * 相关的事件处理
-     * @return {[type]} [description]
-     */
-    Range.prototype.event = function () {
-        // 各个元素
-        var objElement = this.element;
-        var objNumber = this.number;
-        // 主要的几个元素
-        var eleRange = objElement.input;
-        var eleContainer = objElement.container;
-        var eleThumb = objElement.thumb;
-        // 一些数值
-        var numMin = objNumber.min;
-        var numMax = objNumber.max;
-        var numStep = objNumber.step;
-
-        // 移动
-        eleContainer.addEventListener('click', function (event) {
-            var target = event && event.target;
-            if (target && target !== eleThumb && !eleRange.disabled) {
-                var distance = event.clientX - eleRange.offsetLeft - eleThumb.offsetLeft - parseInt(window.getComputedStyle(eleThumb).width) / 2;
-                var value = eleRange.value * 1 + (numMax - numMin) * distance / parseInt(eleContainer.style.width || eleContainer.clientWidth);
-                this.value(value);
-            }
-        }.bind(this));
-
-        // 拖动
-        var objPosThumb = {};
-        var funBindTips = function () {
-            if (this.params.tips) {
-                var strContent = this.params.tips.call(eleThumb, eleRange.value);
-                if (this.tips) {
-                    this.tips.content = strContent;
-                    this.tips.show();
-                } else {
-                    this.tips = new Tips(eleThumb, {
-                        eventType: 'null',
-                        content: strContent
-                    });
-                }
-            }
-        };
-
-        // 判断是否支持touch事件
-        eleThumb.addEventListener(objEventType.start, function (event) {
-            if (eleRange.disabled) {
-                return;
-            }
-            // 阻止默认行为
-            // 否则iOS下可能会触发点击行为
-            event.preventDefault();
-
-            if (event.touches && event.touches.length) {
-                event = event.touches[0];
-            }
-            objPosThumb.x = event.clientX;
-            objPosThumb.value = eleRange.value * 1;
-            // 返回此时tips的提示内容
-            funBindTips.call(this);
-
-            eleThumb.classList.add(ACTIVE);
-        }.bind(this));
-
-        if (objEventType.start == 'mousedown') {
-            eleThumb.addEventListener('mouseenter', function () {
-                if (eleThumb.classList.contains(ACTIVE) == false) {
-                    funBindTips.call(this);
-                }
-            }.bind(this));
-            eleThumb.addEventListener('mouseout', function () {
-                if (eleThumb.classList.contains(ACTIVE) == false) {
-                    if (this.tips) {
-                        this.tips.hide();
-                    }
-                }
-            }.bind(this));
-        }
-
-        // 移动时候
-        document.addEventListener(objEventType.move, function (event) {
-            if (typeof objPosThumb.x === 'number' && eleThumb.classList.contains(ACTIVE)) {
-                // 阻止默认行为
-                event.preventDefault();
-
-                if (event.touches && event.touches.length) {
-                    event = event.touches[0];
-                }
-                // 获取当前位置
-                var numDistance = event.clientX - objPosThumb.x;
-                // 根据移动的距离，判断值
-                var value = objPosThumb.value + (numMax - numMin) * numDistance / parseInt(eleContainer.style.width || eleContainer.clientWidth);
-
-                // 赋值
-                this.value(value);
-
-                // 改变提示内容
-                if (this.tips) {
-                    this.tips.content = this.params.tips.call(eleThumb, eleRange.value);
-                    this.tips.show();
-                }                
-            }
-        }.bind(this));
-
-        // 触摸或点击抬起时候
-        document.addEventListener(objEventType.end, function () {
-            if (eleThumb.classList.contains(ACTIVE)) {
-                objPosThumb.x = null;
-                objPosThumb.value = null;
-                if (this.tips) {
-                    this.tips.hide();
-                }
-                eleThumb.classList.remove(ACTIVE);
-            }            
-        }.bind(this));
-
-        // 键盘支持，左右
-        eleThumb.addEventListener('keydown', function (event) {
-            if (eleRange.disabled) {
-                return;
-            }
-            var strValue = eleRange.value * 1;
-            if (event.keyCode == 37 || event.keyCode == 39) {
-                event.preventDefault();
-                if (event.keyCode == 37) {
-                    // left
-                    strValue = Math.max(numMin, strValue - numStep);
-                } else if (event.keyCode == 39) {
-                    // right
-                    strValue = Math.min(numMax, strValue + numStep * 1);
-                }
-                this.value(strValue);
-            }
-        }.bind(this));
-
-        // 自适应场景下的resize处理
-        if (eleContainer.style.display == 'block') {
-            window.addEventListener('resize', function () {
-                this.position();
-            }.bind(this));
-        }
-
-        // 禁用状态变化检测
-        if (window.MutationObserver) {
-            var observerSelect = new MutationObserver(function (mutationsList) {
-                mutationsList.forEach(function (mutation) {
-                    if (mutation.type == 'attributes') {
-                        this[DISABLED] = eleRange[DISABLED];
-                    }
-                }.bind(this));
-            }.bind(this));
-
-            observerSelect.observe(eleRange, {
-                attributes: true,
-                attributeFilter: [DISABLED]
-            });
-        } else {
-            eleRange.addEventListener('DOMAttrModified', function (event) {
-                if (event.attrName == DISABLED) {
-                    this[DISABLED] = eleRange[DISABLED];
-                }
-            }.bind(this));
-        }
-    };
-
-    /**
-     * range输入框赋值与定位
-     * @param  {String} value 需要赋予的值
-     * @return {Object}       返回当前实例对象
-     */
-    Range.prototype.value = function (value) {
-        var eleInput = this.element.input;
-        var oldValue = eleInput.value;
-
-        // 一些值
-        var number = this.number;
-        var numMax = number.max;
-        var numMin = number.min;
-        var numStep = number.step;
-
-        if (!value && value !== 0) {
-            oldValue = value;
-            value = eleInput.value || Math.floor(numMin / 2 + numMax / 2);
-        }
-        // 区域范围判断以及值是否合法的判断
-        if (value > numMax || (numMax - value) < numStep / 2) {
-            value = numMax;
-        } else if (value === '' || value < numMin || (value - numMin) < numStep / 2) {
-            value = numMin;
-        } else {
-            // 寻找最近的合法value值
-            value = numMin + Math.round((value - numMin) / numStep) * numStep;
-        }
-        // 改变range内部的value值
-        eleInput.value = value;
-        // 圈圈重新定位
-        this.position();
-        // 如果前后值不一样，触发change事件
-        if (value !== oldValue) {
-            eleInput.dispatchEvent(new CustomEvent('change', {
-                'bubbles': true
-            }));
-        }
-        return this;
-    };
-
-    /**
-     * 根据range的值确定UI滑块的位置
-     * @return {Object}       返回当前实例对象
-     */
-    Range.prototype.position = function () {
-        var eleInput = this.element.input;
-        var eleContainer = this.element.container;
-        // 几个数值
-        var objNumber = this.number;
-        var strValue = eleInput.value;
-
-        var numMax = objNumber.max;
-        var numMin = objNumber.min;
-        // 计算百分比
-        this.element.track.style.borderLeftWidth = parseInt(eleContainer.style.width || eleContainer.clientWidth) * (strValue - numMin) / (numMax - numMin) + 'px';
-        // aria同步
-        this.element.thumb.setAttribute('aria-valuenow', strValue);
-
-        return this;
-    };
-
-
-    /**
-     * 定义一个disabled属性，设置元素的禁用态与否
-     * @param {[type]} )
-     */
-    Object.defineProperty(Range.prototype, DISABLED, {
-        configurable: true,
-        enumerable: true,
-        writeable: true,
-        get: function () {
-            return this.element.input[DISABLED];
-        },
-        set: function (value) {
-            var objElement = this.element;
-
-            var eleContainer = objElement.container;
-            var eleThumb = objElement.thumb;
-
-            // 如果设置禁用
-            if (value) {
-                // 容器样式变化
-                eleContainer.classList.add(CL.add(DISABLED));
-                // 滑块按钮不能focus
-                eleThumb.removeAttribute('href');
-                return;
-            }
-
-            // 容器样式变化
-            eleContainer.classList.remove(CL.add(DISABLED));
-            // 滑块按钮不能focus
-            eleThumb.setAttribute('href', 'javascript:');
-        }
-    });
-
-    var funAutoInitAndWatching = function () {
-        // 如果没有开启自动初始化，则返回
-        if (window.autoInit === false) {
-            return;
-        }
-        // 遍历页面上的range元素
-        var strSelector = 'input[type="range"]';
-        // IE11模式下IE9识别不了[type="range"]
-        // 原生IE9没这个问题
-        // 所以这里做一个妥协处理，不支持[type="range"]匹配的使用类名匹配
-        var eleInput = document.createElement('input');
-        eleInput.setAttribute('type', 'range');
-        if (eleInput.getAttribute('type') != 'range') {
-            strSelector = 'input.' + CL.add('input') + ',.' + CL.add('input') + '>input';
-        }
-
-        document.querySelectorAll(strSelector).forEach(function (eleRange) {
-            if (!(eleRange.data && eleRange.data.range) && window.getComputedStyle(eleRange).visibility == 'hidden') {
-                new Range(eleRange);
-            }
-        });
-
-        // 如果没有开启观察，不监听DOM变化
-        if (window.watching === false) {
-            return;
-        }
-
-        var funSyncRefresh = function (node, action) {
-            if (node.nodeType != 1) {
-                return;
-            }
-
-            if (node.matches(strSelector)) {
-                if (action == 'remove' && node.data && node.data.range) {
-                    node.data.range.element.container.remove();
-                } else if (window.getComputedStyle(node).visibility == 'hidden' && action == 'add') {
-                    new Range(node);
-                }
-            }
-        };
-
-        // DOM Insert自动初始化
-        // IE11+使用MutationObserver
-        // IE9-IE10使用Mutation Events
-        if (window.MutationObserver) {
-            var observerSelect = new MutationObserver(function (mutationsList) {
-                mutationsList.forEach(function (mutation) {
-                    var nodeAdded = mutation.addedNodes;
-                    var nodeRemoved = mutation.removedNodes;
-
-                    if (nodeAdded.length) {
-                        nodeAdded.forEach(function (eleAdd) {
-                            funSyncRefresh(eleAdd, 'add');
-                        });
-                    }
-                    if (nodeRemoved.length) {
-                        nodeRemoved.forEach(function (eleRemove) {
-                            funSyncRefresh.call(mutation, eleRemove, 'remove');
-                        });
-                    }
-                });
-            });
-
-            observerSelect.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-        } else {
-            document.body.addEventListener('DOMNodeInserted', function (event) {
-                // 插入节点
-                funSyncRefresh(event.target, 'add');
-            });
-            document.body.addEventListener('DOMNodeRemoved', function (event) {
-                // 删除节点
-                // 这里方法执行的时候，元素还在页面上
-                funSyncRefresh(event.target, 'remove');
-            });
-        }
-    };
-
-    // 监听-免初始绑定
-    if (document.readyState != 'loading') {
-        funAutoInitAndWatching();
-    } else {
-        window.addEventListener('DOMContentLoaded', funAutoInitAndWatching);
-    }
-
-    return Range;
-}));
-/**
- * @Color.js
- * @author zhangxinxu
- * @version
- * Created: 16-06-03
- */
-(function (global, factory) {
-    if (typeof exports === 'object' && typeof module !== 'undefined') {
-        global.Drop = require('./Drop');
-        module.exports = factory();
-    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
-        define(factory);
-    } else {
-        global.Color = factory();
-    }
-}((typeof global !== 'undefined') ? global
-: ((typeof window !== 'undefined') ? window
-    : ((typeof self !== 'undefined') ? self : this)), function (require) {
-    // require
-    var Drop = this.Drop;
-    if (typeof require == 'function' && !Drop) {
-        Drop = require('common/ui/Drop');
-    } else if (!Drop) {
-        window.console.error('need Drop.js');
-
-        return {};
-    }
-
-    /**
-     * 基于HTML原生color颜色选择
-     * 兼容IE9+
-     * type=color Hex format
-     */
-
-    // 样式类名统一处理
-    var CL = {
-        add: function () {
-            return ['ui-color'].concat([].slice.call(arguments)).join('-');
-        },
-        toString: function () {
-            return 'ui-color';
-        }
-    };
-
-    var objEventType = {
-        start: 'mousedown',
-        move: 'mousemove',
-        end: 'mouseup'
-    };
-    if ('ontouchstart' in document) {
-        objEventType = {
-            start: 'touchstart',
-            move: 'touchmove',
-            end: 'touchend'
-        };
-    }
-
-    // 其他变量
-    var ACTIVE = 'active';
-    var BGCOLOR = 'background-color';
-    var defaultValue = '#000000';
-
-    /* 一些颜色间的相互转换的公用方法 */
-
-    // hsl颜色转换成十六进制颜色
-    var funHslToHex = function (h, s, l) {
-        var r, g, b;
-
-        if (s == 0) {
-            // 非彩色的
-            r = g = b = l;
-        } else {
-            var hue2rgb = function (p, q, t) {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1 / 6) return p + (q - p) * 6 * t;
-                if (t < 1 / 2) return q;
-                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-
-                return p;
-            };
-
-            var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            var p = 2 * l - q;
-            r = hue2rgb(p, q, h + 1 / 3);
-            g = hue2rgb(p, q, h);
-            b = hue2rgb(p, q, h - 1 / 3);
-        }
-
-        var arrRgb = [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-
-        return arrRgb.map(function (rgb) {
-            rgb = rgb.toString(16);
-
-            if (rgb.length == 1) {
-                return '0' + rgb;
-            }
-
-            return rgb;
-        }).join('');
-    };
-
-    // 16进制颜色转换成hsl颜色表示
-    var funHexToHsl = function (hex) {
-        var r = parseInt(hex.slice(0, 2), 16) / 255;
-        var g = parseInt(hex.slice(2, 4), 16) / 255;
-        var b = parseInt(hex.slice(4, 6), 16) / 255;
-
-        var max = Math.max(r, g, b);
-        var min = Math.min(r, g, b);
-        var h, s;
-        var l = (max + min) / 2;
-
-        if (max == min) {
-            // 非彩色
-            h = s = 0;
-        } else {
-            var d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            switch (max) {
-                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                case g: h = (b - r) / d + 2; break;
-                case b: h = (r - g) / d + 4; break;
-            }
-            h /= 6;
-        }
-
-        return [h, s, l];
-    };
-
-    // rgb/rgba颜色转hex
-    var funRgbToHex = function (rgb) {
-        if (!rgb) {
-            return defaultValue;
-        }
-        var arr = [];
-
-        // 如果是不全的hex值，不全
-        // 有没有#都支持
-        rgb = rgb.replace('#', '').toLowerCase();
-
-        if (/^[0-9A-F]{1,6}$/i.test(rgb)) {
-            return '#' + rgb.repeat(Math.ceil(6 / rgb.length)).slice(0, 6);
-        }
-
-        // 如果是rgb(a)色值
-        arr = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-        var hex = function (x) {
-            return ('0' + parseInt(x, 10).toString(16)).slice(-2);
-        };
-
-        if (arr.length == 4) {
-            return '#' + hex(arr[1]) + hex(arr[2]) + hex(arr[3]);
-        }
-
-        return defaultValue;
-    };
-
-    /**
-     * 颜色选择实例方法
-     * @param {[type]} element [description]
-     * @param {[type]} options [description]
-     */
-    var Color = function (element, options) {
-        // 参数
-        var defaults = {
-            offsets: {
-                x: 0,
-                y: 0
-            },
-            edgeAdjust: false,
-            position: '7-5',
-            onShow: function () {},
-            onHide: function () {}
-        };
-        var objParams = Object.assign({}, defaults, options || {});
-
-        // element如果是选择器
-        if (typeof element == 'string') {
-            element = document.querySelector(element);
-        }
-
-        // el需要是原生的type=color的输入框
-        if (!element) {
-            return;
-        }
-
-        var eleInput = element;
-
-        // 避免重复初始化
-        if (eleInput.data && eleInput.data.color) {
-            return eleInput.data.color;
-        }
-
-        // 一些默认的属性值
-        var id = eleInput.id;
-
-        if (!id) {
-            // 创建随机id
-            id = 'lulu_' + (Math.random() + '').split('.')[1];
-            eleInput.id = id;
-        }
-
-        // 只读
-        eleInput.setAttribute('readonly', 'readonly');
-        // 阻止默认的颜色选择出现
-        eleInput.addEventListener('click', function (event) {
-            event.preventDefault();
-        });
-        // Edge14-Edge18
-        if (eleInput.type == 'color' && window.msCredentials) {
-            eleInput.addEventListener('focus', function () {
-                this.blur();
-            });
-        }
-
-        // 元素构建
-        // track是替换输入框的色块元素的轨道
-        var eleTrack = document.createElement('label');
-        eleTrack.setAttribute('for', id);
-        eleTrack.classList.add(CL.add('track'));
-
-        // thumb是替换输入框的色块元素的色块区域
-        var eleThumb = document.createElement('span');
-        eleThumb.classList.add(CL.add('thumb'));
-
-        // 前置插入
-        eleTrack.appendChild(eleThumb);
-        eleInput.insertAdjacentElement('beforebegin', eleTrack);
-
-        // 浮层容器
-        var eleContainer = document.createElement('div');
-        eleContainer.classList.add(CL.add('container'));
-
-        // 全局暴露的一些元素
-        this.element = {
-            input: eleInput,
-            container: eleContainer,
-            track: eleTrack,
-            thumb: eleThumb
-        };
-
-        // 暴露的回调方法
-        this.callback = {
-            show: objParams.onShow,
-            hide: objParams.onHide
-        };
-
-        this.params = {
-            offsets: objParams.offsets,
-            edgeAdjust: objParams.edgeAdjust,
-            position: objParams.position
-        };
-
-        // 全局的基础色值
-        var arrBasicColor = ['0', '3', '6', '9', 'c', 'f'];
-        var arrFixedColor = arrBasicColor.concat('eb4646', '1cad70', '2a80eb', 'f59b00');
-        this.color = {
-            basic: arrBasicColor,
-            fixed: arrFixedColor
-        };
-
-        // 事件绑定
-        this.initEvents();
-
-        // 初始化
-        this.value(eleInput.value);
-
-        // data暴露
-        if (eleInput.data) {
-            eleInput.data = {};
-        }
-        eleInput.data.color = this;
-
-        return this;
-    };
-
-    /**
-     * 颜色选择器的事件们
-     * @return {[type]} [description]
-     */
-    Color.prototype.initEvents = function () {
-        var objElement = this.element;
-        // 元素们
-        var eleInput = objElement.input;
-        var eleTrack = objElement.track;
-        var eleContainer = objElement.container;
-        // 参数
-        var objParams = this.params;
-
-        // 浮层显隐与定位
-        this.drop = new Drop(eleInput, eleContainer, {
-            eventType: 'click',
-            offsets: objParams.offsets,
-            edgeAdjust: objParams.edgeAdjust,
-            position: objParams.position,
-            onShow: function () {
-                this.show();
-
-                // 颜色面板边界超出的微调
-                if (objParams.edgeAdjust == false) {
-                    var objRect = eleContainer.getBoundingClientRect();
-                    if (objRect.left < 3) {
-                        eleContainer.style.left =  '3px';
-                    } else if (objRect.right - screen.width > 3) {
-                        eleContainer.style.left = (screen.width - objRect.width - 3) + 'px';
-                    }
-                }
-            }.bind(this),
-            onHide: function () {
-                this.hide();
-
-                eleContainer.style.marginLeft = 0;
-            }.bind(this)
-        });
-
-        // 键盘无障碍访问的处理
-        eleInput.addEventListener('focus', function () {
-            if (window.isKeyEvent) {
-                eleTrack.classList.add('ui-outline');
-            }
-        });
-        eleInput.addEventListener('blur', function () {
-            eleTrack.classList.remove('ui-outline');
-        });
-    };
-
-    /**
-     * container内的一些事件
-     * @return {Object} 返回当前实例对象
-     */
-    Color.prototype.events = function () {
-        var objElement = this.element;
-        // 元素
-        var eleContainer = objElement.container;
-        // 更多元素
-        // 元素
-        var eleCircle = objElement.circle;
-        var eleFill = objElement.fill;
-        var eleArrow = objElement.arrow;
-        // 面板内部唯一的输入框元素
-        var eleField = objElement.field;
-
-        // var keycode = {
-        //     37: 'left',
-        //     38: 'up',
-        //     39: 'right',
-        //     40: 'down',
-        //     13: 'enter'
-        // };
-
-        eleContainer.addEventListener('click', function (event) {
-            var eleTarget = event.target;
-
-            // IE可能是文件节点
-            if (!eleTarget.matches || !eleTarget.matches('a, button')) {
-                return;
-            }
-
-            // 选择的颜色值
-            var strValue = '';
-            // 当前类名
-            var strCl = eleTarget.className;
-            // 按钮分类别处理
-            if (/cancel/.test(strCl)) {
-                // 1. 取消按钮
-                this.hide();
-            } else if (/ensure/.test(strCl)) {
-                // 2. 确定按钮
-                // 赋值
-                strValue = eleField.value;
-
-                if (strValue) {
-                    this.value('#' + strValue);
-                }
-                this.hide();
-            } else if (/lump/.test(strCl)) {
-                // 3. 小色块
-                strValue = eleTarget.getAttribute('data-color');
-                eleField.value = strValue;
-                this.match();
-            } else if (/switch/.test(strCl)) {
-                // 4. 面板类名切换按钮
-                if (eleTarget.innerHTML == '更多') {
-                    objElement.more.style.display = 'block';
-                    objElement.basic.style.display = 'none';
-                    eleTarget.innerHTML = '基本';
-                } else {
-                    objElement.more.style.display = 'none';
-                    objElement.basic.style.display = 'block';
-                    eleTarget.innerHTML = '更多';
-                }
-                // 面板的色块啊，圆和尖角位置匹配
-                this.match();
-            } else if (/cover/.test(strCl)) {
-                // 5. 渐变色的覆盖层
-                // offsetLeft, offsetTop
-                var objRect = eleTarget.getBoundingClientRect();
-                var numOffsetLeft = event.pageX - objRect.left;
-                var numOffsetTop = event.pageY - window.pageYOffset - objRect.top;
-
-                // width, height
-                var numWidth = eleTarget.clientWidth;
-                var numHeight = eleTarget.clientHeight;
-
-                // color
-                var numColorH, strColorS;
-
-                if (eleCircle && eleFill && eleArrow) {
-                    if (/white/.test(strCl) == true) {
-                        numColorH = numOffsetLeft / numWidth;
-                        strColorS = 1 - numOffsetTop / numHeight;
-
-                        // 圈圈定位
-                        eleCircle.style.left = numOffsetLeft + 'px';
-                        eleCircle.style.top = numOffsetTop + 'px';
-
-                        var strHsl = 'hsl(' + [360 * numColorH, 100 * strColorS + '%', '50%'].join() + ')';
-
-                        eleCircle.style[BGCOLOR] = strHsl;
-                    } else {
-                        eleArrow.style.top = numOffsetTop + 'px';
-                    }
-
-                    // 赋值
-                    eleField.value = this.getValueByStyle().replace('#', '');
-                    // UI变化
-                    this.match();
-                }
-            }
-        }.bind(this));
-
-        // 输入框事件
-        eleField.addEventListener('input', function () {
-            var value = this.value;
-            if (/^[0-9A-F]{6}$/i.test(value)) {
-                this.match();
-            } else if (/^[0-9A-F]{3}$/i.test(value)) {
-                this.match(funRgbToHex('#' + value).replace('#', ''));
-            }
-        }.bind(this));
-
-        eleField.addEventListener('keyup', function (event) {
-            if (event.keyCode == 13) {
-                var strValue = eleField.value;
-                var strOldvalue = strValue;
-                if (strValue) {
-                    strValue = $.rgbToHex('#' + strValue);
-                    if (strValue != strOldvalue) {
-                        // 支持输入#000
-                        eleField.value = strValue;
-                    }
-                    this.value('#' + strValue);
-                }
-                this.hide();
-            }
-        }.bind(this));
-
-        // 滑块拖动事件
-        var objPosArrow = {};
-        var objPosCircle = {};
-        // 三角上下
-        eleArrow.addEventListener(objEventType.start, function (event) {
-            event.preventDefault();
-
-            if (event.touches && event.touches.length) {
-                event = event.touches[0];
-            }
-            objPosArrow.pageY = event.pageY;
-            objPosArrow.top = parseFloat(window.getComputedStyle(eleArrow).top);
-        });
-
-        // 圆圈移动
-        eleCircle.addEventListener(objEventType.start, function (event) {
-            event.preventDefault();
-
-            if (event.touches && event.touches.length) {
-                event = event.touches[0];
-            }
-            objPosCircle.pageY = event.pageY;
-            objPosCircle.pageX = event.pageX;
-
-            var objStyleCircle = window.getComputedStyle(eleCircle);
-            // 当前位移位置
-            objPosCircle.top = parseFloat(objStyleCircle.top);
-            objPosCircle.left = parseFloat(objStyleCircle.left);
-        });
-
-        document.addEventListener(objEventType.move, function (event) {
-            if (typeof objPosArrow.top == 'number') {
-                event.preventDefault();
-
-                if (event.touches && event.touches.length) {
-                    event = event.touches[0];
-                }
-                var numTop = objPosArrow.top + (event.pageY - objPosArrow.pageY);
-                var numMaxTop = eleArrow.parentElement.clientHeight;
-
-                // 边界判断
-                if (numTop < 0) {
-                    numTop = 0;
-                } else if (numTop > numMaxTop) {
-                    numTop = numMaxTop;
-                }
-                eleArrow.style.top = numTop + 'px';
-                // 赋值，此次赋值，无需重定位
-                eleField.value = this.getValueByStyle().replace('#', '');
-
-                this.match(false);
-            } else if (typeof objPosCircle.top == 'number') {
-                event.preventDefault();
-
-                if (event.touches && event.touches.length) {
-                    event = event.touches[0];
-                }
-
-                var objPos = {
-                    top: objPosCircle.top + (event.pageY - objPosCircle.pageY),
-                    left: objPosCircle.left + (event.pageX - objPosCircle.pageX)
-                };
-                var objMaxPos = {
-                    top: eleCircle.parentElement.clientHeight,
-                    left: eleCircle.parentElement.clientWidth
-                };
-
-                // 边界判断
-                if (objPos.left < 0) {
-                    objPos.left = 0;
-                } else if (objPos.left > objMaxPos.left) {
-                    objPos.left = objMaxPos.left;
-                }
-                if (objPos.top < 0) {
-                    objPos.top = 0;
-                } else if (objPos.top > objMaxPos.top) {
-                    objPos.top = objMaxPos.top;
-                }
-
-                // 根据目标位置位置和变色
-                var numColorH = objPos.left / objMaxPos.left;
-                var strColorS = 1 - objPos.top / objMaxPos.top;
-
-                // 圈圈定位
-                eleCircle.style.left = objPos.left + 'px';
-                eleCircle.style.top = objPos.top + 'px';
-
-                var strHsl = 'hsl(' + [360 * numColorH, 100 * strColorS + '%', '50%'].join() + ')';
-
-                eleCircle.style[BGCOLOR] = strHsl;
-
-                // 赋值
-                eleField.value = this.getValueByStyle().replace('#', '');
-                // UI变化
-                this.match(false);
-            }
-        }.bind(this), {
-            passive: false
-        });
-        document.addEventListener(objEventType.end, function () {
-            objPosArrow.top = null;
-            objPosCircle.top = null;
-        });
-
-        // 滑块的键盘支持
-        eleFill.parentElement.querySelectorAll('a').forEach(function (eleButton) {
-            eleButton.addEventListener('keydown', function (event) {
-                // 上下控制
-                if (event.keyCode == 38 || event.keyCode == 40) {
-                    event.preventDefault();
-
-                    var numTop = parseFloat(window.getComputedStyle(eleArrow).top);
-
-                    var numMaxTop = eleFill.clientHeight;
-
-                    if (event.keyCode == 38) {
-                        numTop--;
-                        if (numTop < 0) {
-                            numTop = 0;
-                        }
-                    } else {
-                        numTop++;
-                        if (numTop > numMaxTop) {
-                            numTop = numMaxTop;
-                        }
-                    }
-
-                    var ariaLabel = eleArrow.getAttribute('aria-label');
-
-                    eleArrow.style.top = numTop + 'px';
-                    eleArrow.setAttribute('aria-label', ariaLabel.replace(/\d+/, Math.round(100 * numTop / numMaxTop)));
-
-                    // 赋值，此次赋值，无需重定位
-                    eleField.value = this.getValueByStyle().replace('#', '');
-
-                    this.match(false);
-                }
-            }.bind(this));
-        }.bind(this));
-
-        // 圈圈的键盘访问
-        // 区域背景的键盘支持
-        eleCircle.parentElement.querySelectorAll('a').forEach(function (eleRegion) {
-            eleRegion.addEventListener('keydown', function (event) {
-                // 上下左右控制
-                if (event.keyCode >= 37 && event.keyCode <= 40) {
-                    event.preventDefault();
-
-                    var objStyleCircle = window.getComputedStyle(eleCircle);
-
-                    var numTop = parseFloat(objStyleCircle.top);
-                    var numLeft = parseFloat(objStyleCircle.left);
-
-                    var numMaxTop = eleRegion.clientHeight;
-                    var numMaxLeft = eleRegion.clientWidth;
-
-                    if (event.keyCode == 38) {
-                        // up
-                        numTop--;
-                        if (numTop < 0) {
-                            numTop = 0;
-                        }
-                    } else if (event.keyCode == 40) {
-                        // down
-                        numTop++;
-                        if (numTop > numMaxTop) {
-                            numTop = numMaxTop;
-                        }
-                    } else if (event.keyCode == 37) {
-                        // left
-                        numLeft--;
-                        if (numLeft < 0) {
-                            numLeft = 0;
-                        }
-                    } else if (event.keyCode == 39) {
-                        // down
-                        numLeft++;
-                        if (numLeft > numMaxLeft) {
-                            numLeft = numMaxLeft;
-                        }
-                    }
-
-                    var numColorH = numLeft / numMaxLeft;
-                    var numColorS = 1 - numTop / numMaxTop;
-
-                    eleCircle.style.left = numLeft + 'px';
-                    eleCircle.style.top = numTop + 'px';
-
-                    var strHsl = 'hsl(' + [360 * numColorH, 100 * numColorS + '%', '50%'].join() + ')';
-
-                    eleCircle.style[BGCOLOR] = strHsl;
-
-                    // 赋值
-                    eleField.value = this.getValueByStyle().replace('#', '');
-                    this.match();
-                }
-            }.bind(this));
-        }.bind(this));
-
-        return this;
-    };
-
-    /**
-     * container内HTML的创建
-     * @return {Object} 返回当前实例对象
-     */
-    Color.prototype.create = function () {
-        // 元素
-        var eleContainer = this.element.container;
-        var eleInput = this.element.input;
-
-        // switch button
-        var strHtmlConvert = '<button class="' + CL.add('switch') + '" role="button">更多</button>';
-        // current color
-        var strHtmlCurrent = '<div class="' + CL.add('current') + '">\
-            <i class="' + CL.add('current', 'square') + ' colorCurrent"></i>\
-            #<input class="' + CL.add('current', 'input') + '">\
-        </div>';
-
-        var arrBasicColor = this.color.basic;
-        var arrFixedColor = this.color.fixed;
-
-        // body
-        var strHtmlBody = '<div class="' + CL.add('body') + '">' +
-            (function () {
-                // basic color picker
-                var strHtml = '<div class="' + CL.add('basic') + ' colorBasicX" role="listbox">';
-                var arrCommonColors = (localStorage.commonColors || '').split(',');
-                // color left
-                strHtml = strHtml + '<aside class="' + CL.add('basic', 'l') + '">' + (function () {
-                    return arrFixedColor.concat(arrCommonColors[0] || '0ff', arrCommonColors[1] || '800180').map(function (color) {
-                        var strColor = funRgbToHex(color).replace('#', '');
-
-                        return '<a href="javascript:" class="' + CL.add('lump') + '" data-color="' + strColor + '" aria-label="' + strColor + '" style="' + BGCOLOR + ':#' + strColor + '" role="option"></a>';
-                    }).join('');
-                })() + '</aside>';
-
-                // color main
-                strHtml = strHtml + '<div class="' + CL.add('basic', 'r') + '">' + (function () {
-                    var strHtmlR = '';
-                    arrBasicColor.forEach(function (r) {
-                        strHtmlR += '<div class="' + CL.add('lump', 'group') + '">';
-                        arrBasicColor.forEach(function (g) {
-                            arrBasicColor.forEach(function (b) {
-                                var strColor = r + r + g + g + b + b;
-                                strHtmlR = strHtmlR + '<a href="javascript:" class="' + CL.add('lump') + '" data-color="' + strColor + '" style="' + BGCOLOR + ':#' + strColor + '" aria-label="' + strColor + '" role="option"></a>';
-                            });
-                        });
-                        strHtmlR += '</div>';
-                    });
-
-                    return strHtmlR;
-                })() + '</div>';
-
-                return strHtml + '</div>';
-            })() +
-
-            (function () {
-                var strIdGradient = 'lg-' + eleInput.id;
-                var strIdGradient2 = 'lg2-' + eleInput.id;
-                // more color picker
-                var html = '<div class="' + CL.add('more') + ' colorMoreX">';
-                // color left
-                html = html + '<div class="' + CL.add('more', 'l') + '">\
-                <a href="javascript:" class="' + CL.add('cover', 'white') + '" aria-label="色域背景块" role="region"></a><div class="' + CL.add('circle') + ' colorCircle"></div>\
-                <svg>\
-                    <defs>\
-                        <linearGradient x1="0" y1="0" x2="1" y2="0" id="' + strIdGradient + '">\
-                            <stop offset="0%" stop-color="#ff0000"></stop>\
-                            <stop offset="16.66%" stop-color="#ffff00"></stop>\
-                            <stop offset="33.33%" stop-color="#00ff00"></stop>\
-                            <stop offset="50%" stop-color="#00ffff"></stop>\
-                            <stop offset="66.66%" stop-color="#0000ff"></stop>\
-                            <stop offset="83.33%" stop-color="#ff00ff"></stop>\
-                            <stop offset="100%" stop-color="#ff0000"></stop>\
-                        </linearGradient>\
-                    </defs>\
-                    <rect x="0" y="0" width="180" height="100" fill="url(#' + strIdGradient + ')"></rect>\
-                </svg></div><div class="' + CL.add('more', 'r') + '">\
-                    <div class="' + CL.add('more', 'fill') + ' colorFill">\
-                        <a href="javascript:" class="' + CL.add('more', 'cover') + '" aria-label="明度控制背景条" role="region"></a>\
-                        <svg>\
-                        <defs>\
-                            <linearGradient x1="0" y1="0" x2="0" y2="1" id="' + strIdGradient2 + '">\
-                                <stop offset="0%" stop-color="#ffffff"></stop>\
-                                <stop offset="50%" stop-color="rgba(255,255,255,0)"></stop>\
-                                <stop offset="50%" stop-color="rgba(0,0,0,0)"></stop>\
-                                <stop offset="100%" stop-color="' + defaultValue + '"></stop>\
-                            </linearGradient>\
-                        </defs>\
-                        <rect x="0" y="0" width="16" height="100" fill="url(#' + strIdGradient2 + ')"></rect>\
-                    </svg>\
-                    </div>\
-                    <a href="javascript:" class="' + CL.add('more', 'arrow') + ' colorArrow" role="slider" aria-label="明度控制按钮：100%"></a>\
-                </div>';
-
-                return html + '</div>';
-            })() + '</div>';
-        // footer
-        var strHtmlFooter = '<div class="' + CL.add('footer') + '">\
-            <button class="' + CL.add('button', 'cancel') + '">取消</button><button class="' + CL.add('button', 'ensure') + '">确定</button>\
-        </div>';
-        // append
-        eleContainer.innerHTML = strHtmlConvert + strHtmlCurrent + strHtmlBody + strHtmlFooter;
-
-        // 一些元素
-        Object.assign(this.element, {
-            field: eleContainer.querySelector('input'),
-            basic: eleContainer.querySelector('.colorBasicX'),
-            more: eleContainer.querySelector('.colorMoreX'),
-            circle: eleContainer.querySelector('.colorCircle'),
-            fill: eleContainer.querySelector('.colorFill'),
-            arrow: eleContainer.querySelector('.colorArrow'),
-            current: eleContainer.querySelector('.colorCurrent')
-        });
-
-        // 事件
-        this.events();
-
-        return this;
-    };
-
-    /**
-    * 输入框的赋值和取值，同时会更改对应的UI
-    * @param {String} value  HEX颜色值，例如'#000000'。可缺省，表示取值
-    * @return {Object} 返回当前的实例对象
-    */
-    Color.prototype.value = function (value) {
-        var strValue = value;
-        // 元素
-        var eleInput = this.element.input;
-        var eleThumb = this.element.thumb;
-        var eleField = this.element.field;
-        // 目前的颜色值
-        var strOldValue = eleInput.value;
-        // 取值还是赋值
-        if (typeof strValue == 'string') {
-            // 如果是纯字母，则认为是关键字
-            if (/^[a-z]{3,}$/.test(strValue)) {
-                document.head.style.backgroundColor = strValue;
-                strValue = window.getComputedStyle(document.head).backgroundColor;
-                document.head.style.backgroundColor = '';
-            }
-
-            // 使用hex值
-            strValue = funRgbToHex(strValue);
-            // 赋值
-            eleInput.value = strValue;
-            if (eleField) {
-                eleField.value = strValue.replace('#', '');
-            }
-            // 按钮上的色块值
-            eleThumb.style[BGCOLOR] = strValue;
-
-            // 作为常用颜色记录下来
-            var strCommonColors = localStorage.commonColors || '';
-            var arrCommonColors = strCommonColors.split(',');
-            // 前提颜色非纯灰色若干色值
-            var arrFixedColor = this.color.fixed;
-
-            if (arrFixedColor.some(function (strFixedColor) {
-                return funRgbToHex(strFixedColor) == strValue;
-            }) == false) {
-                // 过滤已经存在的相同颜色的色值
-                arrCommonColors = arrCommonColors.filter(function (strValueWithSharp) {
-                    return strValueWithSharp && strValueWithSharp != strValue.replace('#', '');
-                });
-
-                // 从前面插入
-                arrCommonColors.unshift(strValue.replace('#', ''));
-
-                // 本地存储
-                localStorage.commonColors = arrCommonColors.join();
-
-                // 2个动态色值更新
-                var eleBasic = this.element.basic;
-                if (eleBasic) {
-                    var eleAsideColors = eleBasic.querySelectorAll('aside a');
-                    var eleBasicColorLast = eleAsideColors[eleAsideColors.length - 2];
-                    var eleBasicColorSecond = eleAsideColors[eleAsideColors.length - 1];
-
-                    eleBasicColorLast.setAttribute('data-color', arrCommonColors[0]);
-                    eleBasicColorLast.setAttribute('aria-label', arrCommonColors[0]);
-                    eleBasicColorLast.style[BGCOLOR] = strValue;
-
-                    var strColorSecond = arrCommonColors[1] || '0ff';
-                    eleBasicColorSecond.setAttribute('data-color', strColorSecond);
-                    eleBasicColorSecond.setAttribute('aria-label', strColorSecond);
-                    eleBasicColorSecond.style[BGCOLOR] = '#' + strColorSecond;
-                }
-            }
-
-            // 面板上的值，各种定位的匹配
-            this.match();
-        } else {
-            // 取值
-            // 如果默认无值，使用颜色作为色值，一般出现在初始化的时候
-            if (!strOldValue) {
-                strOldValue = defaultValue;
-                // 赋值
-                eleInput.value = strOldValue;
-                // 按钮上的色块值
-                eleThumb.style[BGCOLOR] = strOldValue;
-            }
-
-            return strOldValue;
-        }
-
-        if (strOldValue && strValue != strOldValue) {
-            eleInput.dispatchEvent(new CustomEvent('change', {
-                'bubbles': true
-            }));
-        }
-
-        return this;
-    };
-
-    /**
-     * 根据坐标位置获得hsl值
-     * 私有
-     * @return {String} [返回当前坐标对应的hex表示的颜色值]
-     */
-    Object.defineProperty(Color.prototype, 'getValueByStyle', {
-        value: function () {
-            // 需要的元素
-            var eleCircle = this.element.circle;
-            var eleArrow = this.element.arrow;
-
-            if (eleCircle.length * eleArrow.length == 0) {
-                return defaultValue;
-            }
-
-            var numColorH, numColorS, numColorL;
-            // get color
-            // hsl color
-            if (eleCircle.style.left) {
-                numColorH = parseFloat(window.getComputedStyle(eleCircle).left) / eleCircle.parentElement.clientWidth;
-            } else {
-                numColorH = 0;
-            }
-            if (eleCircle.style.top) {
-                numColorS = 1 - parseFloat(window.getComputedStyle(eleCircle).top) / eleCircle.parentElement.clientHeight;
-            } else {
-                numColorS = 1;
-            }
-            if (eleArrow.style.top) {
-                numColorL = 1 - parseFloat(window.getComputedStyle(eleArrow).top) / eleArrow.parentElement.clientHeight;
-            } else {
-                numColorL = 0;
-            }
-            return '#' + funHslToHex(numColorH, numColorS, numColorL);
-        }
-    });
-
-    /**
-     * 面板的色块啊，圆和尖角位置匹配
-     * @param  {String} value 面板UI相匹配的色值，可缺省，表示使用当前输入框的颜色值进行UI变化
-     * @return {Object}       返回当前实例对象
-     */
-    Color.prototype.match = function (value) {
-        // 首先要面板显示
-        if (this.display != true) {
-            return this;
-        }
-
-        // 元素对象
-        var objElement = this.element;
-        // 元素
-        var eleContainer = objElement.container;
-        var eleCurrent = objElement.current;
-        // 更多元素
-        var eleMore = objElement.more;
-        // 元素
-        var eleCircle = objElement.circle;
-        var eleFill = objElement.fill;
-        var eleArrow = objElement.arrow;
-        // 面板内部唯一的输入框元素
-        var eleField = objElement.field;
-
-        // 重定位
-        var isRePosition = true;
-        if (value === false) {
-            isRePosition = value;
-        }
-
-        // 当前的颜色值
-        var strValue = value || eleField.value;
-        if (strValue == '') {
-            // 如果输入框没有值
-            // 使用之前一个合法的颜色值作为现在值
-            strValue = funRgbToHex(window.getComputedStyle(eleCurrent)[BGCOLOR]).replace('#', '');
-            eleField.value = strValue;
-        }
-        strValue = strValue.replace('#', '');
-
-        // 色块值示意
-        eleCurrent.style[BGCOLOR] = '#' + strValue;
-
-        // 当前是基本色面板还是任意色面板
-        if (window.getComputedStyle(eleMore).display == 'none') {
-            // 1. 基本色
-            // 所有当前高亮的元素不高亮
-            var eleActive = eleContainer.querySelector('.' + ACTIVE);
-            if (eleActive) {
-                eleActive.classList.remove(ACTIVE);
-            }
-            // 所有颜色一致的高亮
-            var eleColorMatch = eleContainer.querySelector('a[data-color="' + strValue.toUpperCase() + '"]');
-            if (eleColorMatch) {
-                eleColorMatch.classList.add(ACTIVE);
-            }
-        } else {
-            // to HSL
-            var arrHSL = funHexToHsl(strValue);
-            // hsl value
-            var numColorH = arrHSL[0];
-            var numColorS = arrHSL[1];
-            var numColorL = arrHSL[2];
-
-            // 滑块和尖角的颜色和位置
-            var strHsl = 'hsl(' + [360 * numColorH, 100 * numColorS + '%', '50%'].join() + ')';
-
-            // 如果不是默认黑色也不是纯白色
-            if (strValue != '000000' && strValue != 'ffffff') {
-                eleCircle.style[BGCOLOR] = strHsl;
-                eleFill.style[BGCOLOR] = strHsl;
-            }
-
-            if (isRePosition == true) {
-                if (numColorL != 0 && numColorL != 1) {
-                    eleCircle.style.left = eleCircle.parentElement.clientWidth * numColorH + 'px';
-                    eleCircle.style.top = eleCircle.parentElement.clientHeight * (1 - numColorS) + 'px';
-                }
-
-                eleArrow.style.top = eleArrow.parentElement.clientHeight * (1 - numColorL) + 'px';
-            }
-        }
-
-        return this;
-    };
-
-    /**
-    * 颜色面板显示
-    * @return {Object} 返回当前实例对象
-    */
-    Color.prototype.show = function () {
-        // 元素
-        var eleContainer = this.element.container;
-
-        // 输入框赋值
-        if (eleContainer.innerHTML.trim() == '') {
-            this.create();
-        }
-
-        // 面板显示
-        if (this.drop.display == false) {
-            this.drop.show();
-        }
-        this.display = this.drop.display;
-
-        // 面板UI匹配
-        var eleCurrent = this.element.current;
-        if (!eleCurrent.getAttribute('style')) {
-            eleCurrent.style[BGCOLOR] = this.element.input.value;
-        }
-        this.match();
-
-        // onShow callback
-        if (typeof this.callback.show == 'function') {
-            this.callback.show.call(this, this.element.track, eleContainer);
-        }
-
-        return this;
-    };
-
-    /**
-     * 颜色面板隐藏
-     * @return {Object} 返回当前实例对象
-     */
-    Color.prototype.hide = function () {
-        // 面板隐藏
-        if (this.drop.display == true) {
-            this.drop.hide();
-        }
-        this.display = this.drop.display;
-
-        this.element.input.focus();
-
-        // onShow callback
-        if (typeof this.callback.hide == 'function') {
-            this.callback.hide.call(this, this.element.trigger, this.element.container);
-        }
-
-        return this;
-    };
-
-    var funAutoInitAndWatching = function () {
-        // 如果没有开启自动初始化，则返回
-        if (window.autoInit === false) {
-            return;
-        }
-        // 遍历页面上的range元素
-        var strSelector = 'input[type="color"]';
-
-        document.querySelectorAll(strSelector).forEach(function (eleColorInput) {
-            if (!(eleColorInput.data && eleColorInput.data.color) && window.getComputedStyle(eleColorInput).opacity == '0') {
-                new Color(eleColorInput);
-            }
-        });
-
-        // 如果没有开启观察，不监听DOM变化
-        if (window.watching === false) {
-            return;
-        }
-
-        var funSyncRefresh = function (node, action) {
-            if (node.nodeType != 1) {
-                return;
-            }
-
-            if (node.matches(strSelector)) {
-                if (action == 'remove' && node.data && node.data.color) {
-                    node.data.color.element.track.remove();
-                    node.data.color.element.container.remove();
-                } else if (action == 'add' && window.getComputedStyle(node).opacity == '0') {
-                    new Color(node);
-                }
-            }
-        };
-
-        // DOM Insert自动初始化
-        // IE11+使用MutationObserver
-        // IE9-IE10使用Mutation Events
-        if (window.MutationObserver) {
-            var observerSelect = new MutationObserver(function (mutationsList) {
-                mutationsList.forEach(function (mutation) {
-                    var nodeAdded = mutation.addedNodes;
-                    var nodeRemoved = mutation.removedNodes;
-
-                    if (nodeAdded.length) {
-                        nodeAdded.forEach(function (eleAdd) {
-                            funSyncRefresh(eleAdd, 'add');
-                        });
-                    }
-                    if (nodeRemoved.length) {
-                        nodeRemoved.forEach(function (eleRemove) {
-                            funSyncRefresh.call(mutation, eleRemove, 'remove');
-                        });
-                    }
-                });
-            });
-
-            observerSelect.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-        } else {
-            document.body.addEventListener('DOMNodeInserted', function (event) {
-                // 插入节点
-                funSyncRefresh(event.target, 'add');
-            });
-            document.body.addEventListener('DOMNodeRemoved', function (event) {
-                // 删除节点
-                // 这里方法执行的时候，元素还在页面上
-                funSyncRefresh(event.target, 'remove');
-            });
-        }
-    };
-
-    // 监听-免初始绑定
-    if (document.readyState != 'loading') {
-        funAutoInitAndWatching();
-    } else {
-        window.addEventListener('DOMContentLoaded', funAutoInitAndWatching);
-    }
-
-    return Color;
-}));
 /**
  * @Dialog.js
  * @author  zhangxinxu
@@ -6514,6 +4158,7 @@
 
     return Dialog;
 }));
+
 /**
  * @Datalist.js
  * @author zhangxinxu
@@ -7590,6 +5235,699 @@
 
     return Datalist;
 }));
+
+/**
+ * @Select.js
+ * @author zhangxinxu
+ * @version
+ * @Created: 15-06-18
+ * @edit:    07-06-15  rewrite
+ * @edit:    09-08-28  native js rewrite
+**/
+
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        module.exports = factory();
+    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
+        define(factory);
+    } else {
+        global.Select = factory();
+    }
+}((typeof global !== 'undefined') ? global
+: ((typeof window !== 'undefined') ? window
+    : ((typeof self !== 'undefined') ? self : this)), function () {
+
+    /**
+     * 模拟下拉框效果
+     * 针对所有浏览器进行处理
+     * 基于原生的<select>元素生成
+     *
+     */
+
+    // 常量变量
+    var SELECT = 'select';
+    var SELECTED = 'selected';
+    var DISABLED = 'disabled';
+    var ACTIVE = 'active';
+    var REVERSE = 'reverse';
+    var MULTIPLE = 'multiple';
+
+    // 样式类名统一处理
+    var CL = {
+        add: function () {
+            return ['ui', SELECT].concat([].slice.call(arguments)).join('-');
+        },
+        toString: function () {
+            return 'ui-' + SELECT;
+        }
+    };
+
+    /**
+     * 基于原生下拉框生成的下拉组件
+     * @param {Object} element 原生select元素
+     */
+    var Select = function (element) {
+        if (!element) {
+            return this;
+        }
+        if (!element.classList.contains("lulu-select")) return;
+        var eleSelect = element;
+
+        // 避免重复初始化
+        if (eleSelect.data && eleSelect.data.select) {
+            return;
+        }
+
+        var strAttrWidth = eleSelect.style.width || eleSelect.getAttribute('width');
+        if (!strAttrWidth) {
+            strAttrWidth = eleSelect.offsetWidth;
+        }
+        this.offsetWidth = strAttrWidth;
+
+        // 构造元素
+        // 1. 得到关联id
+        var strId = eleSelect.id;
+        if (!strId) {
+            strId = ('lulu_' + Math.random()).replace('0.', '');
+        } else {
+            strId = 'lulu_' + strId;
+        }
+        this.id = strId;
+
+        // 2. 是否多选
+        var isMultiple = (typeof eleSelect.getAttribute(MULTIPLE) == 'string');
+        this.multiple = isMultiple;
+
+        // 3. 创建下拉组合框元素
+        var eleCombobox = document.createElement('div');
+        eleCombobox.setAttribute('role', 'combobox');
+
+        // 4. 创建下拉点击按钮元素
+        var eleButton = document.createElement('a');
+        if (!eleSelect[DISABLED]) {
+            eleButton.setAttribute('href', 'javascript:');
+        }
+        eleButton.setAttribute('data-target', strId);
+        // 下面3个aria无障碍访问需要
+        eleButton.setAttribute('role', 'button');
+        eleButton.setAttribute('aria-expanded', 'false');
+        eleButton.setAttribute('aria-owns', strId);
+        // 样式类名
+        eleButton.classList.add(CL.add('button'));
+
+        // 5. 创建下拉列表元素
+        var eleDatalist = document.createElement('div');
+        eleDatalist.id = strId;
+        eleDatalist.setAttribute('role', 'listbox');
+        eleDatalist.setAttribute('aria-expanded', 'true');
+        eleDatalist.classList.add(CL.add('datalist'));
+
+        // 6. 元素组装
+        // multiple没有button
+        if (isMultiple == false) {
+            eleCombobox.appendChild(eleButton);
+            eleCombobox.appendChild(eleDatalist);
+            // 插入到下拉框的后面
+            eleSelect.style.display = 'none';
+            eleSelect.insertAdjacentElement('afterend', eleCombobox);
+        } else {
+            eleCombobox.appendChild(eleDatalist);
+            // 绝对定位隐藏，以便可以响应键盘focus
+            eleSelect.style.position = 'absolute';
+            eleSelect.style.zIndex = 1;
+            eleSelect.insertAdjacentElement('afterend', eleCombobox);
+            // 视觉列表不参与设置为不可访问
+            eleDatalist.setAttribute('aria-hidden', 'true');
+        }
+        // 暴露给其他方法
+        this.element = {
+            select: eleSelect,
+            combobox: eleCombobox,
+            button: eleButton,
+            datalist: eleDatalist
+        };
+
+        // 刷新内容
+        this.refresh();
+
+        // 事件绑定
+        this.events();
+
+        // 存储
+        if (!eleSelect.data) {
+            eleSelect.data = {
+                select: this
+            };
+        } else {
+            eleSelect.data.select = this;
+        }
+    };
+
+    /**
+     * 下拉相关的事件处理
+     * @return {[type]} [description]
+     */
+    Select.prototype.events = function () {
+        // 各个元素
+        var objElement = this.element;
+        // 主要的几个元素
+        var eleSelect = objElement.select;
+        var eleCombobox = objElement.combobox;
+        var eleButton = objElement.button;
+        var eleDatalist = objElement.datalist;
+
+        // 单选下拉框的事件
+        if (this.multiple == false) {
+            // 点击页面空白要隐藏
+            // 测试表明，这里优化下可以提高40~50%性能
+            // 原本是绑定对应元素上，现在改成委托
+            if (!document.isSelectMouseEvent) {
+                document.addEventListener('click', function (event) {
+                    var target = event.target;
+
+                    if (!target || !target.closest) {
+                        return;
+                    }
+
+                    // 获取下拉元素是关键，因为存储了实例对象
+                    // 元素什么的都可以直接匹配
+                    eleCombobox = target.closest('.' + CL);
+                    eleSelect = eleCombobox && eleCombobox.previousElementSibling;
+
+                    if (!eleSelect || !eleSelect.data || !eleSelect.data.select) {
+                        return;
+                    }
+
+                    // 按钮和列表元素就知道了
+                    objElement = eleSelect.data.select.element;
+
+                    eleButton = objElement.button;
+                    eleDatalist = objElement.datalist;
+
+                    // 下面判断点击的是按钮还是列表了
+                    if (eleButton.contains(target)) {
+                        if (eleSelect[DISABLED]) {
+                            return false;
+                        }
+
+                        // 显示与隐藏
+                        eleCombobox.classList.toggle(ACTIVE);
+
+                        if (eleCombobox.classList.contains(ACTIVE)) {
+                            // 边界判断
+                            var isOverflow = eleDatalist.getBoundingClientRect().bottom + window.pageYOffset > Math.max(document.body.clientHeight, window.innerHeight);
+                            eleCombobox.classList[isOverflow ? 'add' : 'remove'](REVERSE);
+                            // aria状态
+                            eleButton.setAttribute('aria-expanded', 'true');
+
+                            // 滚动与定位
+                            var arrDataScrollTop = eleCombobox.dataScrollTop;
+                            var eleDatalistSelected = eleDatalist.querySelector('.' + SELECTED);
+                            // 严格验证
+                            if (arrDataScrollTop && arrDataScrollTop[1] == eleDatalistSelected.getAttribute('data-index') && arrDataScrollTop[2] == eleDatalistSelected.innerText) {
+                                eleDatalist.scrollTop = arrDataScrollTop[0];
+                                // 重置
+                                delete eleCombobox.dataScrollTop;
+                            }
+                        } else {
+                            eleCombobox.classList.remove(REVERSE);
+                            // aria状态
+                            eleButton.setAttribute('aria-expanded', 'false');
+                        }
+                    } else if (eleDatalist.contains(target)) {
+                        // 点击的列表元素
+                        var eleList = target;
+                        // 对应的下拉<option>元素
+                        var eleOption = null;
+                        // 是否当前点击列表禁用
+                        var isDisabled = eleList.classList.contains(DISABLED);
+                        // 获取索引
+                        var indexOption = eleList.getAttribute('data-index');
+                        // 存储可能的滚动定位需要的数据
+                        var scrollTop = eleDatalist.scrollTop;
+                        eleCombobox.dataScrollTop = [scrollTop, indexOption, eleList.innerText];
+
+                        // 修改下拉选中项
+                        if (isDisabled == false) {
+                            eleOption = eleSelect[indexOption];
+                            if (eleOption) {
+                                eleOption[SELECTED] = true;
+                            }
+                        }
+                        // 下拉收起
+                        eleCombobox.classList.remove(ACTIVE);
+                        eleButton.setAttribute('aria-expanded', 'false');
+                        // focus
+                        eleButton.focus();
+                        eleButton.blur();
+
+                        if (isDisabled == false) {
+                            // 更新下拉框
+                            eleSelect.refresh();
+                            // 回调处理
+                            // 触发change事件
+                            eleSelect.dispatchEvent(new CustomEvent('change', {
+                                'bubbles': true
+                            }));
+                        }
+                    }
+                });
+
+                document.addEventListener('mouseup', function (event) {
+                    var target = event.target;
+                    if (!target) {
+                        return;
+                    }
+                    // 识别此时的combobox
+                    eleCombobox = document.querySelector(SELECT + '+.' + CL + '.' + ACTIVE);
+
+                    if (eleCombobox && eleCombobox.contains(target) == false) {
+                        eleCombobox.classList.remove(ACTIVE);
+                        eleCombobox.classList.remove(REVERSE);
+                    }
+                });
+
+                document.isSelectMouseEvent = true;
+            }
+
+            // disabled状态变化与键盘访问
+            var funSyncDisabled = function () {
+                if (eleSelect[DISABLED]) {
+                    eleButton.removeAttribute('href');
+                } else {
+                    eleButton.href = 'javascript:';
+                }
+            };
+            // 禁用状态变化检测
+            if (window.MutationObserver) {
+                var observerSelect = new MutationObserver(function (mutationsList) {
+                    mutationsList.forEach(function (mutation) {
+                        if (mutation.type == 'attributes') {
+                            funSyncDisabled();
+                        }
+                    });
+                });
+
+                observerSelect.observe(eleSelect, {
+                    attributes: true,
+                    attributeFilter: [DISABLED]
+                });
+            } else {
+                eleSelect.addEventListener('DOMAttrModified', function (event) {
+                    if (event.attrName == DISABLED) {
+                        funSyncDisabled();
+                    }
+                });
+            }
+        } else {
+            // 下拉多选
+            // 键盘交互UI同步
+            eleSelect.addEventListener('change', function () {
+                // 更新下拉框
+                this.refresh();
+            }.bind(this));
+            // 滚动同步
+            eleSelect.addEventListener('scroll', function () {
+                eleDatalist.scrollTop = eleSelect.scrollTop;
+            });
+            // hover穿透
+            eleSelect.addEventListener('mousedown', function () {
+                eleSelect.setAttribute('data-active', 'true');
+            });
+            eleSelect.addEventListener('mousemove', function (event) {
+                if (eleSelect.getAttribute('data-active')) {
+                    this.refresh();
+
+                    return;
+                }
+                var clientY = event.clientY;
+                // 当前坐标元素
+                // 最好方法是使用
+                // document.elementsFromPoint
+                // IE10+是document.msElementFromPoint
+                // 但IE8, IE9浏览器并不支持
+                // 所以这里采用其他方法实现
+                // 判断列表的y位置和clientY做比较
+                var eleListAll = eleDatalist.querySelectorAll('a');
+                for (var indexList = 0; indexList < eleListAll.length; indexList++) {
+                    var eleList = eleListAll[indexList];
+                    // hover状态先还原
+                    eleList.removeAttribute('href');
+                    // 然后开始寻找匹配的列表元素
+                    // 进行比对
+                    var beginY = eleList.getBoundingClientRect().top;
+                    var endY = beginY + eleList.clientHeight;
+                    // 如果在区间范围
+                    if (clientY >= beginY && clientY <= endY) {
+                        if (eleList.classList.contains(SELECTED) == false && eleList.classList.contains(DISABLED) == false) {
+                            eleList.href = 'javascript:';
+                        }
+                        // 退出循环
+                        // forEach无法中断，因此这里使用了for循环
+                        break;
+                    }
+                }
+            }.bind(this));
+
+            eleSelect.addEventListener('mouseout', function () {
+                var eleListAllWithHref = eleDatalist.querySelectorAll('a[href]');
+                eleListAllWithHref.forEach(function (eleList) {
+                    eleList.removeAttribute('href');
+                });
+            });
+
+            document.addEventListener('mouseup', function () {
+                eleSelect.removeAttribute('data-active');
+            });
+        }
+    };
+
+    /**
+     * 把下拉元素变成数据，格式为：
+     * [{
+        html: '选项1',
+        value: '1',
+        selected: false,
+        className: 'a'
+     }, {
+        html: '选项2',
+        value: '2',
+        selected: true,
+        className: 'b'
+     }]
+    * @return 数组
+    */
+    Select.prototype.getData = function () {
+        var eleSelect = this.element.select;
+
+        var eleOptions = eleSelect.querySelectorAll('option');
+
+        if (eleOptions.length == 0) {
+            return [{
+                html: ''
+            }];
+        }
+
+        return [].slice.call(eleOptions).map(function (option) {
+            return {
+                html: option.innerHTML,
+                value: option.value,
+                selected: option.selected,
+                disabled: option.disabled,
+                className: option.className
+            };
+        });
+    };
+
+    /**
+     * 下拉刷新方法
+     * @param  {Array} data 根据数组数据显示下拉内容
+     * @return {Object}     返回当前实例对象
+     */
+    Select.prototype.refresh = function (data) {
+        // 实例id
+        var id = this.id;
+        // 是否多选
+        var isMultiple = this.multiple;
+        // 各个元素
+        var objElement = this.element;
+        // 主要的几个元素
+        var eleSelect = objElement.select;
+        var eleCombobox = objElement.combobox;
+        var eleButton = objElement.button;
+        var eleDatalist = objElement.datalist;
+
+        // 获取当下下拉框的数据和状态
+        data = data || this.getData();
+
+        // 下拉组合框元素的UI和尺寸
+        eleCombobox.className = (eleSelect.className + ' ' + CL).trim();
+
+        // offsetWidth/clientWidth/getBoundingClientRect在下拉元素很多的的时候会有明显的性能问题
+        // 因此宽度已知的时候，使用定值，否则实时获取
+        var strAttrWidth = this.offsetWidth;
+
+        if (/\D$/.test(strAttrWidth)) {
+            // 如果是<length>
+            eleCombobox.style.width = strAttrWidth;
+        } else {
+            // 如果是<number>
+            eleCombobox.style.width = strAttrWidth + 'px';
+        }
+
+        // 多选，高度需要同步，因为选项高度不确定
+        if (isMultiple) {
+            eleCombobox.style.height = eleSelect.style.height || (eleSelect.offsetHeight + 'px');
+        } else {
+            // 按钮元素中的文案
+            eleButton.innerHTML = '<span class="' + CL.add('text') + '">' + (function () {
+                var htmlSelected = '';
+
+                data.forEach(function (obj) {
+                    if (obj.selected) {
+                        htmlSelected = obj.html;
+                    }
+                });
+
+                return htmlSelected || data[0].html;
+            })() + '</span><i class="' + CL.add('icon') + '" aria-hidden="true"></i>';
+        }
+
+        // 列表内容的刷新
+        eleDatalist.innerHTML = data.map(function (obj, index) {
+            var arrCl = [CL.add('datalist', 'li'), obj.className];
+
+            if (obj[SELECTED]) {
+                arrCl.push(SELECTED);
+            }
+            if (obj[DISABLED]) {
+                arrCl.push(DISABLED);
+            }
+
+            // 复选模式列表不参与无障碍访问识别，因此HTML相对简单
+            if (isMultiple) {
+                return '<a class="' + arrCl.join(' ') + '" data-index=' + index + '>' + obj.html + '</a>';
+            }
+
+            return '<a ' + (obj[DISABLED] ? '' : 'href="javascript:" ') + 'class="' + arrCl.join(' ') + '" data-index=' + index + ' data-target="' + id + '" role="option" aria-selected="' + obj[SELECTED] + '">' + obj.html + '</a>';
+        }).join('');
+
+        return this;
+    };
+
+    /**
+     * 删除方法
+     * @return {[type]} [description]
+     */
+    Select.prototype.remove = function () {
+        // 主元素
+        var eleCombobox = this.element.combobox;
+
+        if (eleCombobox) {
+            eleCombobox.remove();
+        }
+    };
+
+    // 重新定义select元素的value方法
+    Object.defineProperty(HTMLSelectElement.prototype, 'value', {
+        configurable: true,
+        enumerable: true,
+        writeable: true,
+        get: function () {
+            var arrValue = [];
+            this.querySelectorAll('option').forEach(function (eleOption) {
+                if (eleOption[SELECTED] == true) {
+                    arrValue.push(eleOption.value);
+                }
+            });
+
+            return arrValue.join();
+        },
+        set: function (value) {
+            var isOptionMatch = false;
+            // 是否多选框
+            var isMultiple = (typeof this.getAttribute('multiple') == 'string');
+            if (isMultiple) {
+                value = value.split(',');
+            } else {
+                value = [value.toString()];
+            }
+
+            this.querySelectorAll('option').forEach(function (eleOption) {
+                // 单选框模式下，如果多个值匹配，让第一个选中
+                // 如果没有下面这句，会最后一个匹配的选中
+                if (isMultiple == false && isOptionMatch == true) {
+                    return;
+                }
+                if (value.indexOf(eleOption.value) != -1) {
+                    eleOption[SELECTED] = isOptionMatch = true;
+                } else if (isMultiple) {
+                    eleOption[SELECTED] = false;
+                }
+            });
+
+            // 如果包含匹配的值，则重新刷新
+            if (isOptionMatch == true) {
+                this.refresh();
+            }
+        }
+    });
+
+    HTMLSelectElement.prototype.refresh = function () {
+        if (this.data && this.data.select) {
+            this.data.select.refresh();
+        } else {
+            new Select(this);
+        }
+    };
+
+    var funAutoInitAndWatching = function () {
+        // 如果没有开启自动初始化，则返回
+        if (window.autoInit === false) {
+            return;
+        }
+        document.querySelectorAll(".lulu-select").forEach(function (eleSelect) {
+            if (window.getComputedStyle(eleSelect).opacity != '1') {
+                eleSelect.refresh();
+            }
+        });
+
+        // 如果没有开启观察，不监听DOM变化
+        if (window.watching === false) {
+            return;
+        }
+
+        var funSyncRefresh = function (node, action) {
+            if (node.nodeType != 1) {
+                return;
+            }
+
+            if (node.tagName == 'SELECT') {
+                if (action == 'remove') {
+                    if (node.data && node.data.select) {
+                        node.data.select[action]();
+                    } else {
+                        node.parentNode.removeChild(node);
+                    }
+                } else {
+                    node[action]();
+                }
+            } else if (node.tagName == 'OPTION') {
+                var eleSelect = node.parentElement;
+
+                if (!eleSelect) {
+                    // 可以认为是观察者模式的删除
+                    if (this.target && this.target.tagName == 'SELECT') {
+                        this.target.refresh();
+                    }
+                } else if (eleSelect.data && eleSelect.data.select) {
+                    setTimeout(function () {
+                        eleSelect.refresh();
+                    }, 16);
+                }
+            } else if (action == 'refresh') {
+                // 此时Select初始化也会触发DOM检测
+                // 但没有必要，因此，阻止
+                funAutoInitAndWatching.flag = false;
+                // 只是Select初始化
+                node.querySelectorAll('.lulu-select').forEach(function (element) {
+                    funSyncRefresh(element, action);
+                });
+                // 恢复到正常检测
+                funAutoInitAndWatching.flag = true;
+            }
+        };
+
+        // DOM Insert自动初始化
+        // IE11+使用MutationObserver
+        // IE9-IE10使用Mutation Events
+        if (window.MutationObserver) {
+            var observerSelect = new MutationObserver(function (mutationsList) {
+                // 此时不检测DOM变化
+                if (funAutoInitAndWatching.flag === false || window.watching === false) {
+                    return;
+                }
+                mutationsList.forEach(function (mutation) {
+                    var nodeAdded = mutation.addedNodes;
+                    var nodeRemoved = mutation.removedNodes;
+
+                    if (nodeAdded.length) {
+                        nodeAdded.forEach(function (eleAdd) {
+                            funSyncRefresh.call(mutation, eleAdd, 'refresh');
+                        });
+                    }
+                    if (nodeRemoved.length) {
+                        nodeRemoved.forEach(function (eleRemove) {
+                            funSyncRefresh.call(mutation, eleRemove, 'remove');
+                        });
+                    }
+                });
+            });
+
+            observerSelect.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        } else {
+            // IE9-IE10优化处理
+            // 借助定时器先观察，再统一处理
+            var arrMutationsList = [];
+            var timerRenderList = null;
+
+            var funMutationObserver = function (target, action, event) {
+                // 此时不检测DOM变化
+                if (funAutoInitAndWatching.flag === false || window.watching === false || target.nodeType != 1) {
+                    return;
+                }
+
+                clearTimeout(timerRenderList);
+
+                if (target.tagName == 'SELECT') {
+                    arrMutationsList.push({
+                        action: action,
+                        node: target
+                    });
+                } else if (target.tagName == 'OPTION' && (arrMutationsList.length == 0 || arrMutationsList[arrMutationsList.length - 1].node.contains(target) == false)) {
+                    arrMutationsList.push({
+                        action: 'refresh',
+                        node: event.relatedNode || target
+                    });
+                }
+
+                // 定时器处理
+                timerRenderList = setTimeout(function () {
+                    funAutoInitAndWatching.flag = false;
+
+                    arrMutationsList.forEach(function (objList) {
+                        // 插入节点
+                        funSyncRefresh(objList.node, objList.action);
+                    });
+
+                    funAutoInitAndWatching.flag = true;
+
+                    arrMutationsList = [];
+                }, 16);
+            };
+
+            document.body.addEventListener('DOMNodeInserted', function (event) {
+                funMutationObserver(event.target, 'refresh', event);
+            });
+            document.body.addEventListener('DOMNodeRemoved', function (event) {
+                // relatedNode
+                funMutationObserver(event.target, 'remove', event);
+            });
+        }
+    };
+
+    if (document.readyState != 'loading') {
+        funAutoInitAndWatching();
+    } else {
+        window.addEventListener('DOMContentLoaded', funAutoInitAndWatching);
+    }
+
+    return Select;
+}));
+
 /**
  * @DateTime.js
  * @author zhangxinxu
@@ -9614,6 +7952,1682 @@
 
     return DateTime;
 }));
+
+/**
+ * @Color.js
+ * @author zhangxinxu
+ * @version
+ * Created: 16-06-03
+ */
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        global.Drop = require('./Drop');
+        module.exports = factory();
+    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
+        define(factory);
+    } else {
+        global.Color = factory();
+    }
+}((typeof global !== 'undefined') ? global
+: ((typeof window !== 'undefined') ? window
+    : ((typeof self !== 'undefined') ? self : this)), function (require) {
+    // require
+    var Drop = this.Drop;
+    if (typeof require == 'function' && !Drop) {
+        Drop = require('common/ui/Drop');
+    } else if (!Drop) {
+        window.console.error('need Drop.js');
+
+        return {};
+    }
+
+    /**
+     * 基于HTML原生color颜色选择
+     * 兼容IE9+
+     * type=color Hex format
+     */
+
+    // 样式类名统一处理
+    var CL = {
+        add: function () {
+            return ['ui-color'].concat([].slice.call(arguments)).join('-');
+        },
+        toString: function () {
+            return 'ui-color';
+        }
+    };
+
+    var objEventType = {
+        start: 'mousedown',
+        move: 'mousemove',
+        end: 'mouseup'
+    };
+    if ('ontouchstart' in document) {
+        objEventType = {
+            start: 'touchstart',
+            move: 'touchmove',
+            end: 'touchend'
+        };
+    }
+
+    // 其他变量
+    var ACTIVE = 'active';
+    var BGCOLOR = 'background-color';
+    var defaultValue = '#000000';
+
+    /* 一些颜色间的相互转换的公用方法 */
+
+    // hsl颜色转换成十六进制颜色
+    var funHslToHex = function (h, s, l) {
+        var r, g, b;
+
+        if (s == 0) {
+            // 非彩色的
+            r = g = b = l;
+        } else {
+            var hue2rgb = function (p, q, t) {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1 / 6) return p + (q - p) * 6 * t;
+                if (t < 1 / 2) return q;
+                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+
+                return p;
+            };
+
+            var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            var p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1 / 3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1 / 3);
+        }
+
+        var arrRgb = [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+
+        return arrRgb.map(function (rgb) {
+            rgb = rgb.toString(16);
+
+            if (rgb.length == 1) {
+                return '0' + rgb;
+            }
+
+            return rgb;
+        }).join('');
+    };
+
+    // 16进制颜色转换成hsl颜色表示
+    var funHexToHsl = function (hex) {
+        var r = parseInt(hex.slice(0, 2), 16) / 255;
+        var g = parseInt(hex.slice(2, 4), 16) / 255;
+        var b = parseInt(hex.slice(4, 6), 16) / 255;
+
+        var max = Math.max(r, g, b);
+        var min = Math.min(r, g, b);
+        var h, s;
+        var l = (max + min) / 2;
+
+        if (max == min) {
+            // 非彩色
+            h = s = 0;
+        } else {
+            var d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+
+        return [h, s, l];
+    };
+
+    // rgb/rgba颜色转hex
+    var funRgbToHex = function (rgb) {
+        if (!rgb) {
+            return defaultValue;
+        }
+        var arr = [];
+
+        // 如果是不全的hex值，不全
+        // 有没有#都支持
+        rgb = rgb.replace('#', '').toLowerCase();
+
+        if (/^[0-9A-F]{1,6}$/i.test(rgb)) {
+            return '#' + rgb.repeat(Math.ceil(6 / rgb.length)).slice(0, 6);
+        }
+
+        // 如果是rgb(a)色值
+        arr = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+        var hex = function (x) {
+            return ('0' + parseInt(x, 10).toString(16)).slice(-2);
+        };
+
+        if (arr.length == 4) {
+            return '#' + hex(arr[1]) + hex(arr[2]) + hex(arr[3]);
+        }
+
+        return defaultValue;
+    };
+
+    /**
+     * 颜色选择实例方法
+     * @param {[type]} element [description]
+     * @param {[type]} options [description]
+     */
+    var Color = function (element, options) {
+        // 参数
+        var defaults = {
+            offsets: {
+                x: 0,
+                y: 0
+            },
+            edgeAdjust: false,
+            position: '7-5',
+            onShow: function () {},
+            onHide: function () {}
+        };
+        var objParams = Object.assign({}, defaults, options || {});
+
+        // element如果是选择器
+        if (typeof element == 'string') {
+            element = document.querySelector(element);
+        }
+
+        // el需要是原生的type=color的输入框
+        if (!element) {
+            return;
+        }
+
+        var eleInput = element;
+
+        // 避免重复初始化
+        if (eleInput.data && eleInput.data.color) {
+            return eleInput.data.color;
+        }
+
+        // 一些默认的属性值
+        var id = eleInput.id;
+
+        if (!id) {
+            // 创建随机id
+            id = 'lulu_' + (Math.random() + '').split('.')[1];
+            eleInput.id = id;
+        }
+
+        // 只读
+        eleInput.setAttribute('readonly', 'readonly');
+        // 阻止默认的颜色选择出现
+        eleInput.addEventListener('click', function (event) {
+            event.preventDefault();
+        });
+        // Edge14-Edge18
+        if (eleInput.type == 'color' && window.msCredentials) {
+            eleInput.addEventListener('focus', function () {
+                this.blur();
+            });
+        }
+
+        // 元素构建
+        // track是替换输入框的色块元素的轨道
+        var eleTrack = document.createElement('label');
+        eleTrack.setAttribute('for', id);
+        eleTrack.classList.add(CL.add('track'));
+
+        // thumb是替换输入框的色块元素的色块区域
+        var eleThumb = document.createElement('span');
+        eleThumb.classList.add(CL.add('thumb'));
+
+        // 前置插入
+        eleTrack.appendChild(eleThumb);
+        eleInput.insertAdjacentElement('beforebegin', eleTrack);
+
+        // 浮层容器
+        var eleContainer = document.createElement('div');
+        eleContainer.classList.add(CL.add('container'));
+
+        // 全局暴露的一些元素
+        this.element = {
+            input: eleInput,
+            container: eleContainer,
+            track: eleTrack,
+            thumb: eleThumb
+        };
+
+        // 暴露的回调方法
+        this.callback = {
+            show: objParams.onShow,
+            hide: objParams.onHide
+        };
+
+        this.params = {
+            offsets: objParams.offsets,
+            edgeAdjust: objParams.edgeAdjust,
+            position: objParams.position
+        };
+
+        // 全局的基础色值
+        var arrBasicColor = ['0', '3', '6', '9', 'c', 'f'];
+        var arrFixedColor = arrBasicColor.concat('eb4646', '1cad70', '2a80eb', 'f59b00');
+        this.color = {
+            basic: arrBasicColor,
+            fixed: arrFixedColor
+        };
+
+        // 事件绑定
+        this.initEvents();
+
+        // 初始化
+        this.value(eleInput.value);
+
+        // data暴露
+        if (eleInput.data) {
+            eleInput.data = {};
+        }
+        eleInput.data.color = this;
+
+        return this;
+    };
+
+    /**
+     * 颜色选择器的事件们
+     * @return {[type]} [description]
+     */
+    Color.prototype.initEvents = function () {
+        var objElement = this.element;
+        // 元素们
+        var eleInput = objElement.input;
+        var eleTrack = objElement.track;
+        var eleContainer = objElement.container;
+        // 参数
+        var objParams = this.params;
+
+        // 浮层显隐与定位
+        this.drop = new Drop(eleInput, eleContainer, {
+            eventType: 'click',
+            offsets: objParams.offsets,
+            edgeAdjust: objParams.edgeAdjust,
+            position: objParams.position,
+            onShow: function () {
+                this.show();
+
+                // 颜色面板边界超出的微调
+                if (objParams.edgeAdjust == false) {
+                    var objRect = eleContainer.getBoundingClientRect();
+                    if (objRect.left < 3) {
+                        eleContainer.style.left =  '3px';
+                    } else if (objRect.right - screen.width > 3) {
+                        eleContainer.style.left = (screen.width - objRect.width - 3) + 'px';
+                    }
+                }
+            }.bind(this),
+            onHide: function () {
+                this.hide();
+
+                eleContainer.style.marginLeft = 0;
+            }.bind(this)
+        });
+
+        // 键盘无障碍访问的处理
+        eleInput.addEventListener('focus', function () {
+            if (window.isKeyEvent) {
+                eleTrack.classList.add('ui-outline');
+            }
+        });
+        eleInput.addEventListener('blur', function () {
+            eleTrack.classList.remove('ui-outline');
+        });
+    };
+
+    /**
+     * container内的一些事件
+     * @return {Object} 返回当前实例对象
+     */
+    Color.prototype.events = function () {
+        var objElement = this.element;
+        // 元素
+        var eleContainer = objElement.container;
+        // 更多元素
+        // 元素
+        var eleCircle = objElement.circle;
+        var eleFill = objElement.fill;
+        var eleArrow = objElement.arrow;
+        // 面板内部唯一的输入框元素
+        var eleField = objElement.field;
+
+        // var keycode = {
+        //     37: 'left',
+        //     38: 'up',
+        //     39: 'right',
+        //     40: 'down',
+        //     13: 'enter'
+        // };
+
+        eleContainer.addEventListener('click', function (event) {
+            var eleTarget = event.target;
+
+            // IE可能是文件节点
+            if (!eleTarget.matches || !eleTarget.matches('a, button')) {
+                return;
+            }
+
+            // 选择的颜色值
+            var strValue = '';
+            // 当前类名
+            var strCl = eleTarget.className;
+            // 按钮分类别处理
+            if (/cancel/.test(strCl)) {
+                // 1. 取消按钮
+                this.hide();
+            } else if (/ensure/.test(strCl)) {
+                // 2. 确定按钮
+                // 赋值
+                strValue = eleField.value;
+
+                if (strValue) {
+                    this.value('#' + strValue);
+                }
+                this.hide();
+            } else if (/lump/.test(strCl)) {
+                // 3. 小色块
+                strValue = eleTarget.getAttribute('data-color');
+                eleField.value = strValue;
+                this.match();
+            } else if (/switch/.test(strCl)) {
+                // 4. 面板类名切换按钮
+                if (eleTarget.innerHTML == '更多') {
+                    objElement.more.style.display = 'block';
+                    objElement.basic.style.display = 'none';
+                    eleTarget.innerHTML = '基本';
+                } else {
+                    objElement.more.style.display = 'none';
+                    objElement.basic.style.display = 'block';
+                    eleTarget.innerHTML = '更多';
+                }
+                // 面板的色块啊，圆和尖角位置匹配
+                this.match();
+            } else if (/cover/.test(strCl)) {
+                // 5. 渐变色的覆盖层
+                // offsetLeft, offsetTop
+                var objRect = eleTarget.getBoundingClientRect();
+                var numOffsetLeft = event.pageX - objRect.left;
+                var numOffsetTop = event.pageY - window.pageYOffset - objRect.top;
+
+                // width, height
+                var numWidth = eleTarget.clientWidth;
+                var numHeight = eleTarget.clientHeight;
+
+                // color
+                var numColorH, strColorS;
+
+                if (eleCircle && eleFill && eleArrow) {
+                    if (/white/.test(strCl) == true) {
+                        numColorH = numOffsetLeft / numWidth;
+                        strColorS = 1 - numOffsetTop / numHeight;
+
+                        // 圈圈定位
+                        eleCircle.style.left = numOffsetLeft + 'px';
+                        eleCircle.style.top = numOffsetTop + 'px';
+
+                        var strHsl = 'hsl(' + [360 * numColorH, 100 * strColorS + '%', '50%'].join() + ')';
+
+                        eleCircle.style[BGCOLOR] = strHsl;
+                    } else {
+                        eleArrow.style.top = numOffsetTop + 'px';
+                    }
+
+                    // 赋值
+                    eleField.value = this.getValueByStyle().replace('#', '');
+                    // UI变化
+                    this.match();
+                }
+            }
+        }.bind(this));
+
+        // 输入框事件
+        eleField.addEventListener('input', function () {
+            var value = this.value;
+            if (/^[0-9A-F]{6}$/i.test(value)) {
+                this.match();
+            } else if (/^[0-9A-F]{3}$/i.test(value)) {
+                this.match(funRgbToHex('#' + value).replace('#', ''));
+            }
+        }.bind(this));
+
+        eleField.addEventListener('keyup', function (event) {
+            if (event.keyCode == 13) {
+                var strValue = eleField.value;
+                var strOldvalue = strValue;
+                if (strValue) {
+                    strValue = $.rgbToHex('#' + strValue);
+                    if (strValue != strOldvalue) {
+                        // 支持输入#000
+                        eleField.value = strValue;
+                    }
+                    this.value('#' + strValue);
+                }
+                this.hide();
+            }
+        }.bind(this));
+
+        // 滑块拖动事件
+        var objPosArrow = {};
+        var objPosCircle = {};
+        // 三角上下
+        eleArrow.addEventListener(objEventType.start, function (event) {
+            event.preventDefault();
+
+            if (event.touches && event.touches.length) {
+                event = event.touches[0];
+            }
+            objPosArrow.pageY = event.pageY;
+            objPosArrow.top = parseFloat(window.getComputedStyle(eleArrow).top);
+        });
+
+        // 圆圈移动
+        eleCircle.addEventListener(objEventType.start, function (event) {
+            event.preventDefault();
+
+            if (event.touches && event.touches.length) {
+                event = event.touches[0];
+            }
+            objPosCircle.pageY = event.pageY;
+            objPosCircle.pageX = event.pageX;
+
+            var objStyleCircle = window.getComputedStyle(eleCircle);
+            // 当前位移位置
+            objPosCircle.top = parseFloat(objStyleCircle.top);
+            objPosCircle.left = parseFloat(objStyleCircle.left);
+        });
+
+        document.addEventListener(objEventType.move, function (event) {
+            if (typeof objPosArrow.top == 'number') {
+                event.preventDefault();
+
+                if (event.touches && event.touches.length) {
+                    event = event.touches[0];
+                }
+                var numTop = objPosArrow.top + (event.pageY - objPosArrow.pageY);
+                var numMaxTop = eleArrow.parentElement.clientHeight;
+
+                // 边界判断
+                if (numTop < 0) {
+                    numTop = 0;
+                } else if (numTop > numMaxTop) {
+                    numTop = numMaxTop;
+                }
+                eleArrow.style.top = numTop + 'px';
+                // 赋值，此次赋值，无需重定位
+                eleField.value = this.getValueByStyle().replace('#', '');
+
+                this.match(false);
+            } else if (typeof objPosCircle.top == 'number') {
+                event.preventDefault();
+
+                if (event.touches && event.touches.length) {
+                    event = event.touches[0];
+                }
+
+                var objPos = {
+                    top: objPosCircle.top + (event.pageY - objPosCircle.pageY),
+                    left: objPosCircle.left + (event.pageX - objPosCircle.pageX)
+                };
+                var objMaxPos = {
+                    top: eleCircle.parentElement.clientHeight,
+                    left: eleCircle.parentElement.clientWidth
+                };
+
+                // 边界判断
+                if (objPos.left < 0) {
+                    objPos.left = 0;
+                } else if (objPos.left > objMaxPos.left) {
+                    objPos.left = objMaxPos.left;
+                }
+                if (objPos.top < 0) {
+                    objPos.top = 0;
+                } else if (objPos.top > objMaxPos.top) {
+                    objPos.top = objMaxPos.top;
+                }
+
+                // 根据目标位置位置和变色
+                var numColorH = objPos.left / objMaxPos.left;
+                var strColorS = 1 - objPos.top / objMaxPos.top;
+
+                // 圈圈定位
+                eleCircle.style.left = objPos.left + 'px';
+                eleCircle.style.top = objPos.top + 'px';
+
+                var strHsl = 'hsl(' + [360 * numColorH, 100 * strColorS + '%', '50%'].join() + ')';
+
+                eleCircle.style[BGCOLOR] = strHsl;
+
+                // 赋值
+                eleField.value = this.getValueByStyle().replace('#', '');
+                // UI变化
+                this.match(false);
+            }
+        }.bind(this), {
+            passive: false
+        });
+        document.addEventListener(objEventType.end, function () {
+            objPosArrow.top = null;
+            objPosCircle.top = null;
+        });
+
+        // 滑块的键盘支持
+        eleFill.parentElement.querySelectorAll('a').forEach(function (eleButton) {
+            eleButton.addEventListener('keydown', function (event) {
+                // 上下控制
+                if (event.keyCode == 38 || event.keyCode == 40) {
+                    event.preventDefault();
+
+                    var numTop = parseFloat(window.getComputedStyle(eleArrow).top);
+
+                    var numMaxTop = eleFill.clientHeight;
+
+                    if (event.keyCode == 38) {
+                        numTop--;
+                        if (numTop < 0) {
+                            numTop = 0;
+                        }
+                    } else {
+                        numTop++;
+                        if (numTop > numMaxTop) {
+                            numTop = numMaxTop;
+                        }
+                    }
+
+                    var ariaLabel = eleArrow.getAttribute('aria-label');
+
+                    eleArrow.style.top = numTop + 'px';
+                    eleArrow.setAttribute('aria-label', ariaLabel.replace(/\d+/, Math.round(100 * numTop / numMaxTop)));
+
+                    // 赋值，此次赋值，无需重定位
+                    eleField.value = this.getValueByStyle().replace('#', '');
+
+                    this.match(false);
+                }
+            }.bind(this));
+        }.bind(this));
+
+        // 圈圈的键盘访问
+        // 区域背景的键盘支持
+        eleCircle.parentElement.querySelectorAll('a').forEach(function (eleRegion) {
+            eleRegion.addEventListener('keydown', function (event) {
+                // 上下左右控制
+                if (event.keyCode >= 37 && event.keyCode <= 40) {
+                    event.preventDefault();
+
+                    var objStyleCircle = window.getComputedStyle(eleCircle);
+
+                    var numTop = parseFloat(objStyleCircle.top);
+                    var numLeft = parseFloat(objStyleCircle.left);
+
+                    var numMaxTop = eleRegion.clientHeight;
+                    var numMaxLeft = eleRegion.clientWidth;
+
+                    if (event.keyCode == 38) {
+                        // up
+                        numTop--;
+                        if (numTop < 0) {
+                            numTop = 0;
+                        }
+                    } else if (event.keyCode == 40) {
+                        // down
+                        numTop++;
+                        if (numTop > numMaxTop) {
+                            numTop = numMaxTop;
+                        }
+                    } else if (event.keyCode == 37) {
+                        // left
+                        numLeft--;
+                        if (numLeft < 0) {
+                            numLeft = 0;
+                        }
+                    } else if (event.keyCode == 39) {
+                        // down
+                        numLeft++;
+                        if (numLeft > numMaxLeft) {
+                            numLeft = numMaxLeft;
+                        }
+                    }
+
+                    var numColorH = numLeft / numMaxLeft;
+                    var numColorS = 1 - numTop / numMaxTop;
+
+                    eleCircle.style.left = numLeft + 'px';
+                    eleCircle.style.top = numTop + 'px';
+
+                    var strHsl = 'hsl(' + [360 * numColorH, 100 * numColorS + '%', '50%'].join() + ')';
+
+                    eleCircle.style[BGCOLOR] = strHsl;
+
+                    // 赋值
+                    eleField.value = this.getValueByStyle().replace('#', '');
+                    this.match();
+                }
+            }.bind(this));
+        }.bind(this));
+
+        return this;
+    };
+
+    /**
+     * container内HTML的创建
+     * @return {Object} 返回当前实例对象
+     */
+    Color.prototype.create = function () {
+        // 元素
+        var eleContainer = this.element.container;
+        var eleInput = this.element.input;
+
+        // switch button
+        var strHtmlConvert = '<button class="' + CL.add('switch') + '" role="button">更多</button>';
+        // current color
+        var strHtmlCurrent = '<div class="' + CL.add('current') + '">\
+            <i class="' + CL.add('current', 'square') + ' colorCurrent"></i>\
+            #<input class="' + CL.add('current', 'input') + '">\
+        </div>';
+
+        var arrBasicColor = this.color.basic;
+        var arrFixedColor = this.color.fixed;
+
+        // body
+        var strHtmlBody = '<div class="' + CL.add('body') + '">' +
+            (function () {
+                // basic color picker
+                var strHtml = '<div class="' + CL.add('basic') + ' colorBasicX" role="listbox">';
+                var arrCommonColors = (localStorage.commonColors || '').split(',');
+                // color left
+                strHtml = strHtml + '<aside class="' + CL.add('basic', 'l') + '">' + (function () {
+                    return arrFixedColor.concat(arrCommonColors[0] || '0ff', arrCommonColors[1] || '800180').map(function (color) {
+                        var strColor = funRgbToHex(color).replace('#', '');
+
+                        return '<a href="javascript:" class="' + CL.add('lump') + '" data-color="' + strColor + '" aria-label="' + strColor + '" style="' + BGCOLOR + ':#' + strColor + '" role="option"></a>';
+                    }).join('');
+                })() + '</aside>';
+
+                // color main
+                strHtml = strHtml + '<div class="' + CL.add('basic', 'r') + '">' + (function () {
+                    var strHtmlR = '';
+                    arrBasicColor.forEach(function (r) {
+                        strHtmlR += '<div class="' + CL.add('lump', 'group') + '">';
+                        arrBasicColor.forEach(function (g) {
+                            arrBasicColor.forEach(function (b) {
+                                var strColor = r + r + g + g + b + b;
+                                strHtmlR = strHtmlR + '<a href="javascript:" class="' + CL.add('lump') + '" data-color="' + strColor + '" style="' + BGCOLOR + ':#' + strColor + '" aria-label="' + strColor + '" role="option"></a>';
+                            });
+                        });
+                        strHtmlR += '</div>';
+                    });
+
+                    return strHtmlR;
+                })() + '</div>';
+
+                return strHtml + '</div>';
+            })() +
+
+            (function () {
+                var strIdGradient = 'lg-' + eleInput.id;
+                var strIdGradient2 = 'lg2-' + eleInput.id;
+                // more color picker
+                var html = '<div class="' + CL.add('more') + ' colorMoreX">';
+                // color left
+                html = html + '<div class="' + CL.add('more', 'l') + '">\
+                <a href="javascript:" class="' + CL.add('cover', 'white') + '" aria-label="色域背景块" role="region"></a><div class="' + CL.add('circle') + ' colorCircle"></div>\
+                <svg>\
+                    <defs>\
+                        <linearGradient x1="0" y1="0" x2="1" y2="0" id="' + strIdGradient + '">\
+                            <stop offset="0%" stop-color="#ff0000"></stop>\
+                            <stop offset="16.66%" stop-color="#ffff00"></stop>\
+                            <stop offset="33.33%" stop-color="#00ff00"></stop>\
+                            <stop offset="50%" stop-color="#00ffff"></stop>\
+                            <stop offset="66.66%" stop-color="#0000ff"></stop>\
+                            <stop offset="83.33%" stop-color="#ff00ff"></stop>\
+                            <stop offset="100%" stop-color="#ff0000"></stop>\
+                        </linearGradient>\
+                    </defs>\
+                    <rect x="0" y="0" width="180" height="100" fill="url(#' + strIdGradient + ')"></rect>\
+                </svg></div><div class="' + CL.add('more', 'r') + '">\
+                    <div class="' + CL.add('more', 'fill') + ' colorFill">\
+                        <a href="javascript:" class="' + CL.add('more', 'cover') + '" aria-label="明度控制背景条" role="region"></a>\
+                        <svg>\
+                        <defs>\
+                            <linearGradient x1="0" y1="0" x2="0" y2="1" id="' + strIdGradient2 + '">\
+                                <stop offset="0%" stop-color="#ffffff"></stop>\
+                                <stop offset="50%" stop-color="rgba(255,255,255,0)"></stop>\
+                                <stop offset="50%" stop-color="rgba(0,0,0,0)"></stop>\
+                                <stop offset="100%" stop-color="' + defaultValue + '"></stop>\
+                            </linearGradient>\
+                        </defs>\
+                        <rect x="0" y="0" width="16" height="100" fill="url(#' + strIdGradient2 + ')"></rect>\
+                    </svg>\
+                    </div>\
+                    <a href="javascript:" class="' + CL.add('more', 'arrow') + ' colorArrow" role="slider" aria-label="明度控制按钮：100%"></a>\
+                </div>';
+
+                return html + '</div>';
+            })() + '</div>';
+        // footer
+        var strHtmlFooter = '<div class="' + CL.add('footer') + '">\
+            <button class="' + CL.add('button', 'cancel') + '">取消</button><button class="' + CL.add('button', 'ensure') + '">确定</button>\
+        </div>';
+        // append
+        eleContainer.innerHTML = strHtmlConvert + strHtmlCurrent + strHtmlBody + strHtmlFooter;
+
+        // 一些元素
+        Object.assign(this.element, {
+            field: eleContainer.querySelector('input'),
+            basic: eleContainer.querySelector('.colorBasicX'),
+            more: eleContainer.querySelector('.colorMoreX'),
+            circle: eleContainer.querySelector('.colorCircle'),
+            fill: eleContainer.querySelector('.colorFill'),
+            arrow: eleContainer.querySelector('.colorArrow'),
+            current: eleContainer.querySelector('.colorCurrent')
+        });
+
+        // 事件
+        this.events();
+
+        return this;
+    };
+
+    /**
+    * 输入框的赋值和取值，同时会更改对应的UI
+    * @param {String} value  HEX颜色值，例如'#000000'。可缺省，表示取值
+    * @return {Object} 返回当前的实例对象
+    */
+    Color.prototype.value = function (value) {
+        var strValue = value;
+        // 元素
+        var eleInput = this.element.input;
+        var eleThumb = this.element.thumb;
+        var eleField = this.element.field;
+        // 目前的颜色值
+        var strOldValue = eleInput.value;
+        // 取值还是赋值
+        if (typeof strValue == 'string') {
+            // 如果是纯字母，则认为是关键字
+            if (/^[a-z]{3,}$/.test(strValue)) {
+                document.head.style.backgroundColor = strValue;
+                strValue = window.getComputedStyle(document.head).backgroundColor;
+                document.head.style.backgroundColor = '';
+            }
+
+            // 使用hex值
+            strValue = funRgbToHex(strValue);
+            // 赋值
+            eleInput.value = strValue;
+            if (eleField) {
+                eleField.value = strValue.replace('#', '');
+            }
+            // 按钮上的色块值
+            eleThumb.style[BGCOLOR] = strValue;
+
+            // 作为常用颜色记录下来
+            var strCommonColors = localStorage.commonColors || '';
+            var arrCommonColors = strCommonColors.split(',');
+            // 前提颜色非纯灰色若干色值
+            var arrFixedColor = this.color.fixed;
+
+            if (arrFixedColor.some(function (strFixedColor) {
+                return funRgbToHex(strFixedColor) == strValue;
+            }) == false) {
+                // 过滤已经存在的相同颜色的色值
+                arrCommonColors = arrCommonColors.filter(function (strValueWithSharp) {
+                    return strValueWithSharp && strValueWithSharp != strValue.replace('#', '');
+                });
+
+                // 从前面插入
+                arrCommonColors.unshift(strValue.replace('#', ''));
+
+                // 本地存储
+                localStorage.commonColors = arrCommonColors.join();
+
+                // 2个动态色值更新
+                var eleBasic = this.element.basic;
+                if (eleBasic) {
+                    var eleAsideColors = eleBasic.querySelectorAll('aside a');
+                    var eleBasicColorLast = eleAsideColors[eleAsideColors.length - 2];
+                    var eleBasicColorSecond = eleAsideColors[eleAsideColors.length - 1];
+
+                    eleBasicColorLast.setAttribute('data-color', arrCommonColors[0]);
+                    eleBasicColorLast.setAttribute('aria-label', arrCommonColors[0]);
+                    eleBasicColorLast.style[BGCOLOR] = strValue;
+
+                    var strColorSecond = arrCommonColors[1] || '0ff';
+                    eleBasicColorSecond.setAttribute('data-color', strColorSecond);
+                    eleBasicColorSecond.setAttribute('aria-label', strColorSecond);
+                    eleBasicColorSecond.style[BGCOLOR] = '#' + strColorSecond;
+                }
+            }
+
+            // 面板上的值，各种定位的匹配
+            this.match();
+        } else {
+            // 取值
+            // 如果默认无值，使用颜色作为色值，一般出现在初始化的时候
+            if (!strOldValue) {
+                strOldValue = defaultValue;
+                // 赋值
+                eleInput.value = strOldValue;
+                // 按钮上的色块值
+                eleThumb.style[BGCOLOR] = strOldValue;
+            }
+
+            return strOldValue;
+        }
+
+        if (strOldValue && strValue != strOldValue) {
+            eleInput.dispatchEvent(new CustomEvent('change', {
+                'bubbles': true
+            }));
+        }
+
+        return this;
+    };
+
+    /**
+     * 根据坐标位置获得hsl值
+     * 私有
+     * @return {String} [返回当前坐标对应的hex表示的颜色值]
+     */
+    Object.defineProperty(Color.prototype, 'getValueByStyle', {
+        value: function () {
+            // 需要的元素
+            var eleCircle = this.element.circle;
+            var eleArrow = this.element.arrow;
+
+            if (eleCircle.length * eleArrow.length == 0) {
+                return defaultValue;
+            }
+
+            var numColorH, numColorS, numColorL;
+            // get color
+            // hsl color
+            if (eleCircle.style.left) {
+                numColorH = parseFloat(window.getComputedStyle(eleCircle).left) / eleCircle.parentElement.clientWidth;
+            } else {
+                numColorH = 0;
+            }
+            if (eleCircle.style.top) {
+                numColorS = 1 - parseFloat(window.getComputedStyle(eleCircle).top) / eleCircle.parentElement.clientHeight;
+            } else {
+                numColorS = 1;
+            }
+            if (eleArrow.style.top) {
+                numColorL = 1 - parseFloat(window.getComputedStyle(eleArrow).top) / eleArrow.parentElement.clientHeight;
+            } else {
+                numColorL = 0;
+            }
+            return '#' + funHslToHex(numColorH, numColorS, numColorL);
+        }
+    });
+
+    /**
+     * 面板的色块啊，圆和尖角位置匹配
+     * @param  {String} value 面板UI相匹配的色值，可缺省，表示使用当前输入框的颜色值进行UI变化
+     * @return {Object}       返回当前实例对象
+     */
+    Color.prototype.match = function (value) {
+        // 首先要面板显示
+        if (this.display != true) {
+            return this;
+        }
+
+        // 元素对象
+        var objElement = this.element;
+        // 元素
+        var eleContainer = objElement.container;
+        var eleCurrent = objElement.current;
+        // 更多元素
+        var eleMore = objElement.more;
+        // 元素
+        var eleCircle = objElement.circle;
+        var eleFill = objElement.fill;
+        var eleArrow = objElement.arrow;
+        // 面板内部唯一的输入框元素
+        var eleField = objElement.field;
+
+        // 重定位
+        var isRePosition = true;
+        if (value === false) {
+            isRePosition = value;
+        }
+
+        // 当前的颜色值
+        var strValue = value || eleField.value;
+        if (strValue == '') {
+            // 如果输入框没有值
+            // 使用之前一个合法的颜色值作为现在值
+            strValue = funRgbToHex(window.getComputedStyle(eleCurrent)[BGCOLOR]).replace('#', '');
+            eleField.value = strValue;
+        }
+        strValue = strValue.replace('#', '');
+
+        // 色块值示意
+        eleCurrent.style[BGCOLOR] = '#' + strValue;
+
+        // 当前是基本色面板还是任意色面板
+        if (window.getComputedStyle(eleMore).display == 'none') {
+            // 1. 基本色
+            // 所有当前高亮的元素不高亮
+            var eleActive = eleContainer.querySelector('.' + ACTIVE);
+            if (eleActive) {
+                eleActive.classList.remove(ACTIVE);
+            }
+            // 所有颜色一致的高亮
+            var eleColorMatch = eleContainer.querySelector('a[data-color="' + strValue.toUpperCase() + '"]');
+            if (eleColorMatch) {
+                eleColorMatch.classList.add(ACTIVE);
+            }
+        } else {
+            // to HSL
+            var arrHSL = funHexToHsl(strValue);
+            // hsl value
+            var numColorH = arrHSL[0];
+            var numColorS = arrHSL[1];
+            var numColorL = arrHSL[2];
+
+            // 滑块和尖角的颜色和位置
+            var strHsl = 'hsl(' + [360 * numColorH, 100 * numColorS + '%', '50%'].join() + ')';
+
+            // 如果不是默认黑色也不是纯白色
+            if (strValue != '000000' && strValue != 'ffffff') {
+                eleCircle.style[BGCOLOR] = strHsl;
+                eleFill.style[BGCOLOR] = strHsl;
+            }
+
+            if (isRePosition == true) {
+                if (numColorL != 0 && numColorL != 1) {
+                    eleCircle.style.left = eleCircle.parentElement.clientWidth * numColorH + 'px';
+                    eleCircle.style.top = eleCircle.parentElement.clientHeight * (1 - numColorS) + 'px';
+                }
+
+                eleArrow.style.top = eleArrow.parentElement.clientHeight * (1 - numColorL) + 'px';
+            }
+        }
+
+        return this;
+    };
+
+    /**
+    * 颜色面板显示
+    * @return {Object} 返回当前实例对象
+    */
+    Color.prototype.show = function () {
+        // 元素
+        var eleContainer = this.element.container;
+
+        // 输入框赋值
+        if (eleContainer.innerHTML.trim() == '') {
+            this.create();
+        }
+
+        // 面板显示
+        if (this.drop.display == false) {
+            this.drop.show();
+        }
+        this.display = this.drop.display;
+
+        // 面板UI匹配
+        var eleCurrent = this.element.current;
+        if (!eleCurrent.getAttribute('style')) {
+            eleCurrent.style[BGCOLOR] = this.element.input.value;
+        }
+        this.match();
+
+        // onShow callback
+        if (typeof this.callback.show == 'function') {
+            this.callback.show.call(this, this.element.track, eleContainer);
+        }
+
+        return this;
+    };
+
+    /**
+     * 颜色面板隐藏
+     * @return {Object} 返回当前实例对象
+     */
+    Color.prototype.hide = function () {
+        // 面板隐藏
+        if (this.drop.display == true) {
+            this.drop.hide();
+        }
+        this.display = this.drop.display;
+
+        this.element.input.focus();
+
+        // onShow callback
+        if (typeof this.callback.hide == 'function') {
+            this.callback.hide.call(this, this.element.trigger, this.element.container);
+        }
+
+        return this;
+    };
+
+    var funAutoInitAndWatching = function () {
+        // 如果没有开启自动初始化，则返回
+        if (window.autoInit === false) {
+            return;
+        }
+        // 遍历页面上的range元素
+        var strSelector = 'input[type="color"]';
+
+        document.querySelectorAll(strSelector).forEach(function (eleColorInput) {
+            if (!(eleColorInput.data && eleColorInput.data.color) && window.getComputedStyle(eleColorInput).opacity == '0') {
+                new Color(eleColorInput);
+            }
+        });
+
+        // 如果没有开启观察，不监听DOM变化
+        if (window.watching === false) {
+            return;
+        }
+
+        var funSyncRefresh = function (node, action) {
+            if (node.nodeType != 1) {
+                return;
+            }
+
+            if (node.matches(strSelector)) {
+                if (action == 'remove' && node.data && node.data.color) {
+                    node.data.color.element.track.remove();
+                    node.data.color.element.container.remove();
+                } else if (action == 'add' && window.getComputedStyle(node).opacity == '0') {
+                    new Color(node);
+                }
+            }
+        };
+
+        // DOM Insert自动初始化
+        // IE11+使用MutationObserver
+        // IE9-IE10使用Mutation Events
+        if (window.MutationObserver) {
+            var observerSelect = new MutationObserver(function (mutationsList) {
+                mutationsList.forEach(function (mutation) {
+                    var nodeAdded = mutation.addedNodes;
+                    var nodeRemoved = mutation.removedNodes;
+
+                    if (nodeAdded.length) {
+                        nodeAdded.forEach(function (eleAdd) {
+                            funSyncRefresh(eleAdd, 'add');
+                        });
+                    }
+                    if (nodeRemoved.length) {
+                        nodeRemoved.forEach(function (eleRemove) {
+                            funSyncRefresh.call(mutation, eleRemove, 'remove');
+                        });
+                    }
+                });
+            });
+
+            observerSelect.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        } else {
+            document.body.addEventListener('DOMNodeInserted', function (event) {
+                // 插入节点
+                funSyncRefresh(event.target, 'add');
+            });
+            document.body.addEventListener('DOMNodeRemoved', function (event) {
+                // 删除节点
+                // 这里方法执行的时候，元素还在页面上
+                funSyncRefresh(event.target, 'remove');
+            });
+        }
+    };
+
+    // 监听-免初始绑定
+    if (document.readyState != 'loading') {
+        funAutoInitAndWatching();
+    } else {
+        window.addEventListener('DOMContentLoaded', funAutoInitAndWatching);
+    }
+
+    return Color;
+}));
+
+/**
+ * @Range.js
+ * @author zhangxinxu
+ * @version
+ * @created: 15-07-20
+ * @edit:    19-09-24 remove jQuery by 5ibinbin
+ * @review:  19-09-27 by zhangxinxu
+ */
+
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        global.Tips = require('./Tips');
+        module.exports = factory();
+    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
+        define(factory);
+    } else {
+        global.Range = factory();
+    }
+}((typeof global !== 'undefined') ? global
+    : ((typeof window !== 'undefined') ? window
+        : ((typeof self !== 'undefined') ? self : this)), function (require) {
+    var Tips = this.Tips;
+    if (typeof require === 'function' && !Tips) {
+        Tips = require('common/ui/Tips');
+    } else if (!Tips) {
+        window.console.error('need Tips.js');
+        return {};
+    }
+
+    /**
+     * 基于HTML原生range范围选择框的模拟选择框效果
+     * 兼容IE9+
+     * min/max/step
+     */
+    // 状态类名
+    var REVERSE = 'reverse';
+    var ACTIVE = 'active';
+    var DISABLED = 'disabled';
+
+    // 样式类名统一处理
+    var CL = {
+        add: function () {
+            return ['ui', 'range'].concat([].slice.call(arguments)).join('-');
+        },
+        toString: function () {
+            return 'ui-range';
+        }
+    };
+
+    var objEventType = {
+        start: 'mousedown',
+        move: 'mousemove',
+        end: 'mouseup'
+    };
+    if ('ontouchstart' in document) {
+        objEventType = {
+            start: 'touchstart',
+            move: 'touchmove',
+            end: 'touchend'
+        };
+    }
+
+    /**
+     * range滑块效果
+     * @param {Object} element 原生的type为range的input元素
+     * @param {Object} options 可选参数
+     */
+    var Range = function (element, options) {
+        var defaults = {
+            reverse: false,
+            tips: function (value) {
+                return value;
+            }
+        };
+
+        options = options || {};
+
+        // 参数合并
+        var objParams = Object.assign({}, defaults, options);
+
+        // 获取<range>元素
+        var eleRange = element;
+        if (typeof element == 'string') {
+            eleRange = document.querySelector(element);
+        }
+
+        if (!eleRange) {
+            return this;
+        }
+
+        if (eleRange.data && eleRange.data.range) {
+            return eleRange.data.range;
+        }
+
+        // 一些属性值获取
+        var numMin = eleRange.getAttribute('min') || 0;
+        var numMax = eleRange.getAttribute('max') || 100;
+        var numStep = eleRange.getAttribute('step') || 1;
+
+        // 一些元素的创建
+        var eleContainer = document.createElement('div');
+        var eleRangeClass = eleRange.className;
+        eleContainer.setAttribute('class', eleRangeClass);
+        eleContainer.classList.add(CL);
+
+        // 轨道元素
+        var eleTrack = document.createElement('div');
+        eleTrack.classList.add(CL.add('track'));
+
+        // 中间的圈圈
+        var eleThumb = document.createElement('a');
+        eleThumb.setAttribute('href', 'javascript:');
+        eleThumb.setAttribute('aria-valuenow', eleRange.value);
+        eleThumb.setAttribute('aria-valuemax', numMax);
+        eleThumb.setAttribute('aria-valuemin', numMin);
+        eleThumb.setAttribute('role', 'slider');
+        eleThumb.setAttribute('draggable', 'false');
+        eleThumb.classList.add(CL.add('thumb'));
+
+        // 是否反向
+        if (objParams.reverse || eleRange.classList.contains(REVERSE)) {
+            objParams.reverse = true;
+            eleThumb.classList.add(REVERSE);
+        }
+
+        // tips提示Function
+        var strTips = eleRange.getAttribute('data-tips');
+        if (strTips && !options.tips) {
+            if (strTips == 'null') {
+                objParams.tips = null;
+            } else {
+                objParams.tips = function (value) {
+                    return strTips.replace('${value}', value);
+                };
+            }
+        }
+
+        // 前置插入
+        eleRange.insertAdjacentElement('afterend', eleContainer);
+        // 如果元素没宽度，则使用el计算的宽度
+        if (eleRange.getAttribute('width') != '100%' && eleRange.parentElement.classList.contains(CL.add('input')) == false) {
+            eleContainer.style.width = window.getComputedStyle(eleRange).width;
+        } else {
+            eleContainer.style.display = 'block';
+        }
+        eleContainer.style.height = window.getComputedStyle(eleRange).height;
+
+        eleRange.style.display = 'none';
+
+        // 组装
+        eleTrack.appendChild(eleThumb);
+        eleContainer.appendChild(eleTrack);
+
+        // 全局变量
+        this.number = {
+            min: +numMin,
+            max: +numMax,
+            step: +numStep
+        };
+        // 暴露给其他方法
+        this.element = {
+            input: eleRange,
+            container: eleContainer,
+            track: eleTrack,
+            thumb: eleThumb
+        };
+        this.params = objParams;
+        // 初始化
+        this.value();
+        // 事件
+        this.event();
+
+        // 禁用态
+        if (eleRange[DISABLED] == true) {
+            this.disabled = true;
+        }
+
+        // 实例自身通过DOM元素暴露
+        if (!eleRange.data) {
+            eleRange.data = {};
+        }
+
+        eleRange.data.range = this;
+
+        return this;
+    };
+
+    /**
+     * 相关的事件处理
+     * @return {[type]} [description]
+     */
+    Range.prototype.event = function () {
+        // 各个元素
+        var objElement = this.element;
+        var objNumber = this.number;
+        // 主要的几个元素
+        var eleRange = objElement.input;
+        var eleContainer = objElement.container;
+        var eleThumb = objElement.thumb;
+        // 一些数值
+        var numMin = objNumber.min;
+        var numMax = objNumber.max;
+        var numStep = objNumber.step;
+
+        // 移动
+        eleContainer.addEventListener('click', function (event) {
+            var target = event && event.target;
+            if (target && target !== eleThumb && !eleRange.disabled) {
+                var distance = event.clientX - eleRange.offsetLeft - eleThumb.offsetLeft - parseInt(window.getComputedStyle(eleThumb).width) / 2;
+                var value = eleRange.value * 1 + (numMax - numMin) * distance / parseInt(eleContainer.style.width || eleContainer.clientWidth);
+                this.value(value);
+            }
+        }.bind(this));
+
+        // 拖动
+        var objPosThumb = {};
+        var funBindTips = function () {
+            if (this.params.tips) {
+                var strContent = this.params.tips.call(eleThumb, eleRange.value);
+                if (this.tips) {
+                    this.tips.content = strContent;
+                    this.tips.show();
+                } else {
+                    this.tips = new Tips(eleThumb, {
+                        eventType: 'null',
+                        content: strContent
+                    });
+                }
+            }
+        };
+
+        // 判断是否支持touch事件
+        eleThumb.addEventListener(objEventType.start, function (event) {
+            if (eleRange.disabled) {
+                return;
+            }
+            // 阻止默认行为
+            // 否则iOS下可能会触发点击行为
+            event.preventDefault();
+
+            if (event.touches && event.touches.length) {
+                event = event.touches[0];
+            }
+            objPosThumb.x = event.clientX;
+            objPosThumb.value = eleRange.value * 1;
+            // 返回此时tips的提示内容
+            funBindTips.call(this);
+
+            eleThumb.classList.add(ACTIVE);
+        }.bind(this));
+
+        if (objEventType.start == 'mousedown') {
+            eleThumb.addEventListener('mouseenter', function () {
+                if (eleThumb.classList.contains(ACTIVE) == false) {
+                    funBindTips.call(this);
+                }
+            }.bind(this));
+            eleThumb.addEventListener('mouseout', function () {
+                if (eleThumb.classList.contains(ACTIVE) == false) {
+                    if (this.tips) {
+                        this.tips.hide();
+                    }
+                }
+            }.bind(this));
+        }
+
+        // 移动时候
+        document.addEventListener(objEventType.move, function (event) {
+            if (typeof objPosThumb.x === 'number' && eleThumb.classList.contains(ACTIVE)) {
+                // 阻止默认行为
+                event.preventDefault();
+
+                if (event.touches && event.touches.length) {
+                    event = event.touches[0];
+                }
+                // 获取当前位置
+                var numDistance = event.clientX - objPosThumb.x;
+                // 根据移动的距离，判断值
+                var value = objPosThumb.value + (numMax - numMin) * numDistance / parseInt(eleContainer.style.width || eleContainer.clientWidth);
+
+                // 赋值
+                this.value(value);
+
+                // 改变提示内容
+                if (this.tips) {
+                    this.tips.content = this.params.tips.call(eleThumb, eleRange.value);
+                    this.tips.show();
+                }                
+            }
+        }.bind(this));
+
+        // 触摸或点击抬起时候
+        document.addEventListener(objEventType.end, function () {
+            if (eleThumb.classList.contains(ACTIVE)) {
+                objPosThumb.x = null;
+                objPosThumb.value = null;
+                if (this.tips) {
+                    this.tips.hide();
+                }
+                eleThumb.classList.remove(ACTIVE);
+            }            
+        }.bind(this));
+
+        // 键盘支持，左右
+        eleThumb.addEventListener('keydown', function (event) {
+            if (eleRange.disabled) {
+                return;
+            }
+            var strValue = eleRange.value * 1;
+            if (event.keyCode == 37 || event.keyCode == 39) {
+                event.preventDefault();
+                if (event.keyCode == 37) {
+                    // left
+                    strValue = Math.max(numMin, strValue - numStep);
+                } else if (event.keyCode == 39) {
+                    // right
+                    strValue = Math.min(numMax, strValue + numStep * 1);
+                }
+                this.value(strValue);
+            }
+        }.bind(this));
+
+        // 自适应场景下的resize处理
+        if (eleContainer.style.display == 'block') {
+            window.addEventListener('resize', function () {
+                this.position();
+            }.bind(this));
+        }
+
+        // 禁用状态变化检测
+        if (window.MutationObserver) {
+            var observerSelect = new MutationObserver(function (mutationsList) {
+                mutationsList.forEach(function (mutation) {
+                    if (mutation.type == 'attributes') {
+                        this[DISABLED] = eleRange[DISABLED];
+                    }
+                }.bind(this));
+            }.bind(this));
+
+            observerSelect.observe(eleRange, {
+                attributes: true,
+                attributeFilter: [DISABLED]
+            });
+        } else {
+            eleRange.addEventListener('DOMAttrModified', function (event) {
+                if (event.attrName == DISABLED) {
+                    this[DISABLED] = eleRange[DISABLED];
+                }
+            }.bind(this));
+        }
+    };
+
+    /**
+     * range输入框赋值与定位
+     * @param  {String} value 需要赋予的值
+     * @return {Object}       返回当前实例对象
+     */
+    Range.prototype.value = function (value) {
+        var eleInput = this.element.input;
+        var oldValue = eleInput.value;
+
+        // 一些值
+        var number = this.number;
+        var numMax = number.max;
+        var numMin = number.min;
+        var numStep = number.step;
+
+        if (!value && value !== 0) {
+            oldValue = value;
+            value = eleInput.value || Math.floor(numMin / 2 + numMax / 2);
+        }
+        // 区域范围判断以及值是否合法的判断
+        if (value > numMax || (numMax - value) < numStep / 2) {
+            value = numMax;
+        } else if (value === '' || value < numMin || (value - numMin) < numStep / 2) {
+            value = numMin;
+        } else {
+            // 寻找最近的合法value值
+            value = numMin + Math.round((value - numMin) / numStep) * numStep;
+        }
+        // 改变range内部的value值
+        eleInput.value = value;
+        // 圈圈重新定位
+        this.position();
+        // 如果前后值不一样，触发change事件
+        if (value !== oldValue) {
+            eleInput.dispatchEvent(new CustomEvent('change', {
+                'bubbles': true
+            }));
+        }
+        return this;
+    };
+
+    /**
+     * 根据range的值确定UI滑块的位置
+     * @return {Object}       返回当前实例对象
+     */
+    Range.prototype.position = function () {
+        var eleInput = this.element.input;
+        var eleContainer = this.element.container;
+        // 几个数值
+        var objNumber = this.number;
+        var strValue = eleInput.value;
+
+        var numMax = objNumber.max;
+        var numMin = objNumber.min;
+        // 计算百分比
+        this.element.track.style.borderLeftWidth = parseInt(eleContainer.style.width || eleContainer.clientWidth) * (strValue - numMin) / (numMax - numMin) + 'px';
+        // aria同步
+        this.element.thumb.setAttribute('aria-valuenow', strValue);
+
+        return this;
+    };
+
+
+    /**
+     * 定义一个disabled属性，设置元素的禁用态与否
+     * @param {[type]} )
+     */
+    Object.defineProperty(Range.prototype, DISABLED, {
+        configurable: true,
+        enumerable: true,
+        writeable: true,
+        get: function () {
+            return this.element.input[DISABLED];
+        },
+        set: function (value) {
+            var objElement = this.element;
+
+            var eleContainer = objElement.container;
+            var eleThumb = objElement.thumb;
+
+            // 如果设置禁用
+            if (value) {
+                // 容器样式变化
+                eleContainer.classList.add(CL.add(DISABLED));
+                // 滑块按钮不能focus
+                eleThumb.removeAttribute('href');
+                return;
+            }
+
+            // 容器样式变化
+            eleContainer.classList.remove(CL.add(DISABLED));
+            // 滑块按钮不能focus
+            eleThumb.setAttribute('href', 'javascript:');
+        }
+    });
+
+    var funAutoInitAndWatching = function () {
+        // 如果没有开启自动初始化，则返回
+        if (window.autoInit === false) {
+            return;
+        }
+        // 遍历页面上的range元素
+        var strSelector = 'input[type="range"]';
+        // IE11模式下IE9识别不了[type="range"]
+        // 原生IE9没这个问题
+        // 所以这里做一个妥协处理，不支持[type="range"]匹配的使用类名匹配
+        var eleInput = document.createElement('input');
+        eleInput.setAttribute('type', 'range');
+        if (eleInput.getAttribute('type') != 'range') {
+            strSelector = 'input.' + CL.add('input') + ',.' + CL.add('input') + '>input';
+        }
+
+        document.querySelectorAll(strSelector).forEach(function (eleRange) {
+            if (!(eleRange.data && eleRange.data.range) && window.getComputedStyle(eleRange).visibility == 'hidden') {
+                new Range(eleRange);
+            }
+        });
+
+        // 如果没有开启观察，不监听DOM变化
+        if (window.watching === false) {
+            return;
+        }
+
+        var funSyncRefresh = function (node, action) {
+            if (node.nodeType != 1) {
+                return;
+            }
+
+            if (node.matches(strSelector)) {
+                if (action == 'remove' && node.data && node.data.range) {
+                    node.data.range.element.container.remove();
+                } else if (window.getComputedStyle(node).visibility == 'hidden' && action == 'add') {
+                    new Range(node);
+                }
+            }
+        };
+
+        // DOM Insert自动初始化
+        // IE11+使用MutationObserver
+        // IE9-IE10使用Mutation Events
+        if (window.MutationObserver) {
+            var observerSelect = new MutationObserver(function (mutationsList) {
+                mutationsList.forEach(function (mutation) {
+                    var nodeAdded = mutation.addedNodes;
+                    var nodeRemoved = mutation.removedNodes;
+
+                    if (nodeAdded.length) {
+                        nodeAdded.forEach(function (eleAdd) {
+                            funSyncRefresh(eleAdd, 'add');
+                        });
+                    }
+                    if (nodeRemoved.length) {
+                        nodeRemoved.forEach(function (eleRemove) {
+                            funSyncRefresh.call(mutation, eleRemove, 'remove');
+                        });
+                    }
+                });
+            });
+
+            observerSelect.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        } else {
+            document.body.addEventListener('DOMNodeInserted', function (event) {
+                // 插入节点
+                funSyncRefresh(event.target, 'add');
+            });
+            document.body.addEventListener('DOMNodeRemoved', function (event) {
+                // 删除节点
+                // 这里方法执行的时候，元素还在页面上
+                funSyncRefresh(event.target, 'remove');
+            });
+        }
+    };
+
+    // 监听-免初始绑定
+    if (document.readyState != 'loading') {
+        funAutoInitAndWatching();
+    } else {
+        window.addEventListener('DOMContentLoaded', funAutoInitAndWatching);
+    }
+
+    return Range;
+}));
+
 /**
  * @Validate.js
  * @author zhangxinxu
@@ -9631,8 +9645,8 @@
         global.Validate = factory();
     }
 }((typeof global !== 'undefined') ? global
-: ((typeof window !== 'undefined') ? window
-    : ((typeof self !== 'undefined') ? self : this)), function (require) {
+    : ((typeof window !== 'undefined') ? window
+        : ((typeof self !== 'undefined') ? self : this)), function (require) {
 
     var ErrorTip = this.ErrorTip;
     if (typeof require == 'function' && !ErrorTip) {
@@ -10094,6 +10108,8 @@
                 } else if (objValidateState.customError) {
                     // 先看看有没有自定义的提示
                     strFinalText = optionPrompt.customError || defaultPrompt.customError;
+                }else if(objValidateState.remoteInValid){
+                    strFinalText=element.remoteResult
                 }
 
                 if (typeof strFinalText == 'function') {
@@ -10101,6 +10117,116 @@
                 }
 
                 return strFinalText;
+            },
+
+            // pendingCount:0,
+            // pending:{},
+            getRemoteValidation:function(element){
+                var remoteInValid=false;
+                if(element.customValidate.remoteUrl && element.customValidate.remoteQueryName && element.value){
+                    if(element.pending===undefined){
+                        remoteInValid=true;
+                        //request
+                        this.requestRemoteValidate(element,true);
+
+                    }else{
+                        if(element.pending){
+                            remoteInValid=true;
+
+                        }else{
+                            if(element.lastValue===element.value){
+                                remoteInValid=!(element.remoteResult === true);
+
+                            }else{
+                                remoteInValid=true;
+                                //request
+                                this.requestRemoteValidate(element);
+
+                            }
+                        }
+                    }
+                }
+                return {remoteInValid:remoteInValid};
+
+
+
+
+            },
+            requestRemoteValidate:function(element,submitTrigger){
+                element.pending=true;
+                // element.currentRequest= $.ajax({
+                //     url:element.customValidate.remoteUrl,
+                //     dataType: "json",
+                //     data:{[element.customValidate.remoteQueryName]:element.value} ,
+                //     beforeSend:function(){
+                //         if(element.currentRequest){
+                //             console.log('abort')
+                //             element.currentRequest.abort();
+                //         }
+                //     },
+                //     success:function(response){
+                //         var valid = response === true || response === "true",
+                //             errors, message, submitted;
+                //         if(valid){
+                //             element.remoteResult= true;
+                //         }else{
+                //             element.remoteResult=response;
+                //         }
+                //         element.pending=false;
+                //
+                //         if(submitTrigger){
+                //             element.customValidate.owner.element.form.dispatchEvent(new CustomEvent('submit'));
+                //
+                //         }else{
+                //             // create and dispatch the event
+                //             var event = new CustomEvent("formCheckValidity", {
+                //                 'bubbles'    : true, // Whether the event will bubble up through the DOM or not
+                //                 'cancelable' : true
+                //             });
+                //             element.customValidate.owner.element.form.dispatchEvent(event);
+                //         }
+                //     }
+                // });
+
+                if(element.currentXHR){
+                    element.currentXHR.abort();
+                }
+                element.currentXHR = new XMLHttpRequest();
+                element.currentXHR.onreadystatechange = function() {
+                    if (this.readyState == 4 ) {
+                        if(this.status == 200){
+                            var valid = this.response === true || this.response === "true",
+                                errors, message, submitted;
+                            if(valid){
+                                element.remoteResult= true;
+                            }else{
+                                element.remoteResult=this.response;
+                            }
+
+                        }else{
+                            //远程验证失败也认为验证通过，防止因为验证接口问题影响整个表单提交。
+                            element.remoteResult= true;
+                        }
+                        element.pending=false;
+
+                        if(submitTrigger){
+                            element.customValidate.owner.element.form.dispatchEvent(new CustomEvent('submit'));
+
+                        }else{
+                            // create and dispatch the event
+                            var event = new CustomEvent("formCheckValidity", {
+                                'bubbles'    : true, // Whether the event will bubble up through the DOM or not
+                                'cancelable' : true
+                            });
+                            element.customValidate.owner.element.form.dispatchEvent(event);
+                        }
+
+                    }
+                };
+
+                element.currentXHR.open("GET", element.customValidate.remoteUrl+'?'+element.customValidate.remoteQueryName+'='+element.value, true);
+                element.currentXHR.send();
+
             },
 
             /*
@@ -10130,7 +10256,8 @@
                 };
 
                 // 主要针对required必填或必选属性的验证
-                if (!element || element.disabled) {
+                if (!element ) {
+                    // if (!element || element.disabled) {
                     return objValidateState;
                 }
 
@@ -10253,17 +10380,17 @@
                 // 获取正则表达式，pattern属性获取优先，然后通过type类型匹配。
                 // 注意，不处理为空的情况
                 regex = regex || (function () {
-                    return element.getAttribute('pattern');
-                })() ||
-                (function () {
-                    // 文本框类型处理，可能有管道符——多类型重叠，如手机或邮箱
-                    return strType && strType.split('|').map(function (strTypeSplit) {
-                        var regMatch = document.validate.reg[strTypeSplit];
-                        if (regMatch) {
-                            return regMatch;
-                        }
-                    }).join('|');
-                })();
+                        return element.getAttribute('pattern');
+                    })() ||
+                    (function () {
+                        // 文本框类型处理，可能有管道符——多类型重叠，如手机或邮箱
+                        return strType && strType.split('|').map(function (strTypeSplit) {
+                            var regMatch = document.validate.reg[strTypeSplit];
+                            if (regMatch) {
+                                return regMatch;
+                            }
+                        }).join('|');
+                    })();
 
                 // 如果没有正则匹配的表达式，就没有验证的说法，认为出错为false
                 if (!regex) {
@@ -10556,7 +10683,7 @@
                 // 如果值不变，且之前已经验证过，
                 // 且不是单复选框，则直接返回
                 // 避免同一元素短时间多次验证
-                if (element.lastValidateState && element.lastValue === element.value && /radio|checkbox/.test(element.type) == false) {
+                if (element.lastValidateState && element.lastValue === element.value && /radio|checkbox/.test(element.type) == false && !element.lastValidateState.remoteInValid) {
                     return element.lastValidateState;
                 }
 
@@ -10578,6 +10705,7 @@
                 // 但是，不足以满足实际需求
                 objValidateState = Object.assign({}, objValidateState, this.getMissingState(element), this.getMismatchState(element), this.getRangeState(element), this.getLengthState(element), this.getCustomState(element));
 
+
                 var isSomeInvalid = false;
 
                 for (var keyValidate in objValidateState) {
@@ -10585,6 +10713,13 @@
                         isSomeInvalid = true;
                     }
                 }
+                if(!isSomeInvalid){
+                    isSomeInvalid=this.getRemoteValidation(element).remoteInValid;
+                    objValidateState.remoteInValid=isSomeInvalid;
+                }
+
+
+
 
                 objValidateState.valid = !isSomeInvalid;
 
@@ -10674,13 +10809,16 @@
             errorTip: function (element, content) {
                 var eleTarget = this.getTarget(element);
 
-                if (!eleTarget || !content) {
+
+
+
+
+                if (!eleTarget || !content || element.pending) {
                     return this;
                 }
 
                 // 如果元素隐藏，也不提示
                 var objStyle = window.getComputedStyle(eleTarget);
-
                 if (objStyle.display == 'none' || objStyle.visibility == 'hidden') {
                     return this;
                 }
@@ -10757,7 +10895,7 @@
                         }
                     } else if (eleControl.focus && eleControl.select) {
                         eleControl.focus();
-                        eleControl.select();
+                        // eleControl.select();
                     }
                 };
 
@@ -10807,17 +10945,17 @@
                     eleTarget = element.parentElement.querySelector('label.ui-radio[for=' + strId + ']');
                 } else if (strType == 'checkbox' && objStyle.opacity != '1') {
                     eleTarget = element.parentElement.querySelector('label.ui-checkbox[for=' + strId + ']');
-                // 下拉框
+                    // 下拉框
                 } else if (strType == 'select' || strTag == 'select') {
                     if (objStyle.opacity != '1') {
                         eleTarget = element.nextElementSibling;
                     }
-                // range范围选择框
+                    // range范围选择框
                 } else if (strType == 'range') {
                     if (objStyle.display == 'none') {
                         eleTarget = element.nextElementSibling;
                     }
-                // 隐藏元素的目标提示元素的转移
+                    // 隐藏元素的目标提示元素的转移
                 } else if (strType == 'hidden' || objStyle.display == 'none' || objStyle.visibility == 'hidden') {
                     var eleTargetRel = document.getElementById(eleTarget.getAttribute('data-target')) || element.dataTarget;
                     if (eleTargetRel) {
@@ -10844,6 +10982,7 @@
             get: function ValidityState () {
                 return document.validate.getValidity(this);
             },
+
             configurable: true
         });
 
@@ -10943,30 +11082,65 @@
             label: true,
             // 自定义验证提示与数据
             validate: [
-            // 下面为结构示意
-            /*{
-                id: '',
-                report: {
-                    // 源自规范，详见：https://www.zhangxinxu.com/wordpress/?p=8895
-                    badInput: '该错误类型对应的提示'
-                    customError: '该错误类型对应的提示'
-                    patternMismatch: '该错误类型对应的提示'
-                    rangeOverflow: '该错误类型对应的提示'
-                    rangeUnderflow: '该错误类型对应的提示'
-                    stepMismatch: '该错误类型对应的提示'
-                    tooLong: '该错误类型对应的提示'
-                    tooShort: '该错误类型对应的提示'
-                    typeMismatch: '该错误类型对应的提示'
-                    valueMissing: '该错误类型对应的提示'
-                },
-                method: function () {}
-            }*/
+                // 下面为结构示意
+                /*{
+                    id: '',
+                    report: {
+                        // 源自规范，详见：https://www.zhangxinxu.com/wordpress/?p=8895
+                        badInput: '该错误类型对应的提示'
+                        customError: '该错误类型对应的提示'
+                        patternMismatch: '该错误类型对应的提示'
+                        rangeOverflow: '该错误类型对应的提示'
+                        rangeUnderflow: '该错误类型对应的提示'
+                        stepMismatch: '该错误类型对应的提示'
+                        tooLong: '该错误类型对应的提示'
+                        tooShort: '该错误类型对应的提示'
+                        typeMismatch: '该错误类型对应的提示'
+                        valueMissing: '该错误类型对应的提示'
+                    },
+                    method: function () {},
+                    remoteUrl:""//远程验证的地址
+                    remoteQueryName:""//远程验证的属性名称
+                }*/
             ],
             onError: function () {},
             onSuccess: function () {}
         };
 
-        var objParams = Object.assign({}, defaults, options || {});
+        // //data属性
+        eleForm.querySelectorAll('input, select, textarea').forEach(function (eleInput) {
+            var validateOption={};
+            if(eleInput.getAttribute('data-remote-url')){
+                validateOption.remoteUrl=eleInput.getAttribute('data-remote-url');
+            };
+            if(eleInput.getAttribute('data-remote-queryname')){
+                validateOption.remoteQueryName=eleInput.getAttribute('data-remote-queryname');
+            };
+            if(eleInput.getAttribute('id')){
+                validateOption.id=eleInput.getAttribute('id');
+            };
+            if(validateOption.id && validateOption.remoteUrl && validateOption.remoteQueryName){
+                let exist=false;
+                for(let i=0;i<options.validate.length;i++){
+                    if(options.validate[i].id===validateOption.id){
+                        exist=true;
+                        options.validate[i].remoteUrl=validateOption.remoteUrl;
+                        options.validate[i].remoteQueryName=validateOption.remoteQueryName;
+                        break;
+                    }
+                }
+                if(!exist){
+                    if(!options.validate){
+                        options.validate=[];
+                    }
+                    options.validate.push(validateOption)
+                }
+            }
+        });
+
+
+        var objParams = Object.assign({}, defaults, options || {},);
+        // console.log(objParams)
 
         // 还原禁用的提交和关闭按钮
         eleForm.querySelectorAll('[type="submit"]:disabled, [type="image"]:disabled').forEach(function (eleSubmit) {
@@ -10986,6 +11160,13 @@
 
             return false;
         }.bind(this));
+
+        //触发验证
+        eleForm.addEventListener("formCheckValidity", function (event) {
+            this.checkValidity();
+        }.bind(this));
+
+
 
         // 自定义的验证绑定
         var dataValidate = objParams.validate;
@@ -11227,6 +11408,8 @@
 
                         // 触发input事件
                         element.dispatchEvent(new CustomEvent('input'));
+
+
                     });
                 }
             });
@@ -11312,6 +11495,7 @@
      * @return {Boolean} 是否表单所有元素验证通过
      */
     Validate.prototype.checkValidity = function () {
+        // console.log('check')
         var eleForm = this.element.form;
 
         var isAllPass = true;
@@ -11328,6 +11512,9 @@
                     this.reportValidity(element);
                     isAllPass = false;
                 }
+                // else if(!element.lastValidateState.remoteInValid){
+                //     this.reportValidity(element);
+                // }
                 // 回调触发
                 this.callback[isPass ? 'success' : 'error'].call(this, element);
             }
@@ -11353,6 +11540,7 @@
 
     return Validate;
 }));
+
 /**
  * @Pagination.js
  * @author zhangxinxu
@@ -11776,6 +11964,279 @@
 
     return Pagination;
 }));
+
+/**
+ * @Form.js
+ * @author zhangxinxu
+ * @version
+ * @created  16-03-01
+ * @edited   19-12-02    ES5原生语法支持
+ */
+
+(function (global, factory) {
+    if (typeof exports === 'object' && typeof module !== 'undefined') {
+        global.LightTip = require('../ui/LightTip');
+        global.Loading = require('../ui/Loading');
+        global.Validate = require('../ui/Validate');
+        module.exports = factory();
+    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
+        define(factory);
+    } else {
+        global.Form = factory();
+    }
+}((typeof global !== 'undefined') ? global
+: ((typeof window !== 'undefined') ? window
+    : ((typeof self !== 'undefined') ? self : this)), function (require) {
+    var LightTip = this.LightTip;
+    var Loading = this.Loading;
+    var Validate = this.Validate;
+    // require
+    if (typeof require == 'function') {
+        // 轻tips
+        if (!LightTip) {
+            LightTip = require('common/ui/LightTip');
+        }
+        // 加载
+        if (!Loading) {
+            Loading = require('common/ui/Loading');
+        }
+        // 验证
+        if (!Validate) {
+            Validate = require('common/ui/Validate');
+        }
+    } else if (!Validate) {
+        window.console.error('need Validate.js');
+
+        return {};
+    } else if (!LightTip) {
+        window.console.error('need LightTip.js');
+
+        return {};
+    } else if (!Loading) {
+        window.console.warn('need Loading.js');
+    }
+
+    /**
+     * 表单解决方案组件
+     * @使用示例
+     *  new Form('#form', {}, {});
+     */
+    var DISABLED = 'disabled';
+
+    // 表单
+    var Form = function (element, optionCallback, optionValidate) {
+        if (typeof element == 'string') {
+            element = document.querySelector(element);
+        }
+        if (!element) {
+            return this;
+        }
+
+        // 避免重复初始化
+        if (element.data && element.data.form) {
+            return element.data.form;
+        }
+
+        // optionCallback可以是对象也可以直接是成功回调
+        /*
+            optionCallback = {
+                avoidSend: function () {},    // 验证成功之后，请求发送前的条件约束
+                success: function () {},
+                error: function () {},
+                complete: function () {}
+            };
+        */
+        optionCallback = optionCallback || function () {};
+        if (typeof optionCallback == 'function') {
+            optionCallback = {
+                success: optionCallback
+            };
+        }
+
+        optionValidate = optionValidate || {};
+
+        // 表单元素
+        var eleForm = element;
+        // 通过submit按钮找到找到关联的我们肉眼所见的提交按钮
+        var eleBtnSubmit = eleForm.querySelector('[type="submit"], [type="image"]');
+        if (!eleBtnSubmit) {
+            eleBtnSubmit = eleForm.querySelector('button:nth-of-last-type()');
+        }
+
+        if (!eleBtnSubmit) {
+            return this;
+        }
+
+        // 下拉框的初始化
+        if (window.autoInit === false) {
+            // 下拉框
+            eleForm.querySelectorAll('select').forEach(function (eleSelect) {
+                if (eleSelect.refresh) {
+                    eleSelect.refresh();
+                }
+            });
+        }
+
+        // 暴露的元素
+        this.element = {
+            form: eleForm,
+            submit: eleBtnSubmit
+        };
+
+        // 回调方法们
+        this.callback = optionCallback;
+
+        // 绑定表单验证
+        this.validate = new Validate(eleForm, function () {
+            // 验证成功之后
+            if (!optionCallback.avoidSend || !optionCallback.avoidSend.call(this, eleForm)) {
+                this.ajax();
+            }
+        }.bind(this), optionValidate);
+
+        if (!eleForm.data) {
+            eleForm.data = {};
+        }
+
+        eleForm.data.form = this;
+
+        return this;
+    };
+
+    /**
+     * 表单提交的处理
+     * @return {[type]} [description]
+     */
+    Form.prototype.ajax = function () {
+        // 回调
+        var optionCallback = this.callback;
+        // 元素
+        var eleForm = this.element.form;
+        var eleButton = null;
+        var eleSubmit = this.element.submit;
+
+        // 我们肉眼所见的按钮，进行一些状态控制
+        eleButton = eleSubmit.id && document.querySelector('label[for=' + eleSubmit.id + ']');
+        if (!eleButton) {
+            eleButton = eleSubmit;
+        }
+        this.element.button = eleButton;
+
+        // 请求地址
+        var strUrl = eleForm.action.split('#')[0] || location.href.split('#')[0];
+        // 请求类型
+        var strMethod = eleForm.method || 'POST';
+
+        // IE9不支持cros跨域
+        if (!history.pushState && new URL(strUrl).host != location.host) {
+            new LightTip().error('当前浏览器不支持跨域数据请求。');
+            return;
+        }
+
+        // 提交数据
+        // 1. 菊花转起来
+        eleButton.loading = true;
+        // 2. 提交按钮禁用
+        eleSubmit.setAttribute(DISABLED, DISABLED);
+
+        // 3. 数据
+        var objFormData = new FormData(eleForm);
+        if (optionCallback.beforeSend) {
+            optionCallback.beforeSend.call(this, xhr, objFormData);
+        }
+        // 请求类型不同，数据地址也不一样
+        var strSearchParams = '';
+
+        if (strMethod.toLowerCase() == 'get') {
+            strSearchParams = new URLSearchParams(objFormData).toString();
+
+            if (strUrl.split('?').length > 1) {
+                strUrl = strUrl + '&' + strSearchParams;
+            } else {
+                strUrl = strUrl + '?' + strSearchParams;
+            }
+        }
+
+        // 4. 请求走起来
+        var xhr = new XMLHttpRequest();
+        xhr.open(strMethod, strUrl);
+
+        // 请求结束
+        xhr.onload = function () {
+            var json = {};
+
+            try {
+                json = JSON.parse(xhr.responseText);
+
+                if (json && (json.code == 0 || json.error == 0)) {
+                    // 成功回调
+                    if (optionCallback.success) {
+                        optionCallback.success.call(this, json);
+                    } else {
+                        // 如果没有成功回调，组件自己提示成功
+                        new LightTip().success(json.msg || '操作成功。');
+                    }
+                } else {
+                    new LightTip().error((json && json.msg) || '返回数据格式不符合要求。');
+
+                    // 失败回调
+                    if (optionCallback.error) {
+                        optionCallback.error.call(this, json);
+                    }
+                }
+            } catch (event) {
+                new LightTip().error(json.msg || '返回数据解析出错。');
+                // 回调
+                if (optionCallback.error) {
+                    optionCallback.error.call(this, event);
+                }
+            }
+
+            funLoadend(json);
+        }.bind(this);
+
+        // 请求错误
+        xhr.onerror = function () {
+            new LightTip().error('网络异常，刚才的操作没有成功，您可以稍后重试。');
+            // 回调
+            if (optionCallback.error) {
+                optionCallback.error.apply(this, arguments);
+            }
+
+            funLoadend();
+        }.bind(this);
+
+
+        // 请求结束，无论成功还是失败
+        // xhr.onloadend IE9不支持，因此这里使用
+        // 其他方法代替
+        var funLoadend = function () {
+            // 菊花关闭
+            eleButton.loading = false;
+            // 表单恢复提交
+            eleSubmit.removeAttribute(DISABLED);
+            // 回调
+            if (optionCallback.complete) {
+                optionCallback.complete.apply(this, arguments);
+            }
+        };
+
+        xhr.send(objFormData);
+    };
+
+    /**
+     * 执行表单的提交
+     * @return {Object} 返回当前实例对象
+     */
+    Form.prototype.submit = function () {
+        this.element.form.dispatchEvent(new CustomEvent('submit'));
+
+        return this;
+    };
+
+    return Form;
+}));
+
 /**
  * @Table.js
  * @author   zhangxinxu
@@ -12537,275 +12998,4 @@
     };
 
     return Table;
-}));
-/**
- * @Form.js
- * @author zhangxinxu
- * @version
- * @created  16-03-01
- * @edited   19-12-02    ES5原生语法支持
- */
-
-(function (global, factory) {
-    if (typeof exports === 'object' && typeof module !== 'undefined') {
-        global.LightTip = require('../ui/LightTip');
-        global.Loading = require('../ui/Loading');
-        global.Validate = require('../ui/Validate');
-        module.exports = factory();
-    } else if (typeof define === 'function' && (define.amd || define.cmd)) {
-        define(factory);
-    } else {
-        global.Form = factory();
-    }
-}((typeof global !== 'undefined') ? global
-: ((typeof window !== 'undefined') ? window
-    : ((typeof self !== 'undefined') ? self : this)), function (require) {
-    var LightTip = this.LightTip;
-    var Loading = this.Loading;
-    var Validate = this.Validate;
-    // require
-    if (typeof require == 'function') {
-        // 轻tips
-        if (!LightTip) {
-            LightTip = require('common/ui/LightTip');
-        }
-        // 加载
-        if (!Loading) {
-            Loading = require('common/ui/Loading');
-        }
-        // 验证
-        if (!Validate) {
-            Validate = require('common/ui/Validate');
-        }
-    } else if (!Validate) {
-        window.console.error('need Validate.js');
-
-        return {};
-    } else if (!LightTip) {
-        window.console.error('need LightTip.js');
-
-        return {};
-    } else if (!Loading) {
-        window.console.warn('need Loading.js');
-    }
-
-    /**
-     * 表单解决方案组件
-     * @使用示例
-     *  new Form('#form', {}, {});
-     */
-    var DISABLED = 'disabled';
-
-    // 表单
-    var Form = function (element, optionCallback, optionValidate) {
-        if (typeof element == 'string') {
-            element = document.querySelector(element);
-        }
-        if (!element) {
-            return this;
-        }
-
-        // 避免重复初始化
-        if (element.data && element.data.form) {
-            return element.data.form;
-        }
-
-        // optionCallback可以是对象也可以直接是成功回调
-        /*
-            optionCallback = {
-                avoidSend: function () {},    // 验证成功之后，请求发送前的条件约束
-                success: function () {},
-                error: function () {},
-                complete: function () {}
-            };
-        */
-        optionCallback = optionCallback || function () {};
-        if (typeof optionCallback == 'function') {
-            optionCallback = {
-                success: optionCallback
-            };
-        }
-
-        optionValidate = optionValidate || {};
-
-        // 表单元素
-        var eleForm = element;
-        // 通过submit按钮找到找到关联的我们肉眼所见的提交按钮
-        var eleBtnSubmit = eleForm.querySelector('[type="submit"], [type="image"]');
-        if (!eleBtnSubmit) {
-            eleBtnSubmit = eleForm.querySelector('button:nth-of-last-type()');
-        }
-
-        if (!eleBtnSubmit) {
-            return this;
-        }
-
-        // 下拉框的初始化
-        if (window.autoInit === false) {
-            // 下拉框
-            eleForm.querySelectorAll('select').forEach(function (eleSelect) {
-                if (eleSelect.refresh) {
-                    eleSelect.refresh();
-                }
-            });
-        }
-
-        // 暴露的元素
-        this.element = {
-            form: eleForm,
-            submit: eleBtnSubmit
-        };
-
-        // 回调方法们
-        this.callback = optionCallback;
-
-        // 绑定表单验证
-        this.validate = new Validate(eleForm, function () {
-            // 验证成功之后
-            if (!optionCallback.avoidSend || !optionCallback.avoidSend.call(this, eleForm)) {
-                this.ajax();
-            }
-        }.bind(this), optionValidate);
-
-        if (!eleForm.data) {
-            eleForm.data = {};
-        }
-
-        eleForm.data.form = this;
-
-        return this;
-    };
-
-    /**
-     * 表单提交的处理
-     * @return {[type]} [description]
-     */
-    Form.prototype.ajax = function () {
-        // 回调
-        var optionCallback = this.callback;
-        // 元素
-        var eleForm = this.element.form;
-        var eleButton = null;
-        var eleSubmit = this.element.submit;
-
-        // 我们肉眼所见的按钮，进行一些状态控制
-        eleButton = eleSubmit.id && document.querySelector('label[for=' + eleSubmit.id + ']');
-        if (!eleButton) {
-            eleButton = eleSubmit;
-        }
-        this.element.button = eleButton;
-
-        // 请求地址
-        var strUrl = eleForm.action.split('#')[0] || location.href.split('#')[0];
-        // 请求类型
-        var strMethod = eleForm.method || 'POST';
-
-        // IE9不支持cros跨域
-        if (!history.pushState && new URL(strUrl).host != location.host) {
-            new LightTip().error('当前浏览器不支持跨域数据请求。');
-            return;
-        }
-
-        // 提交数据
-        // 1. 菊花转起来
-        eleButton.loading = true;
-        // 2. 提交按钮禁用
-        eleSubmit.setAttribute(DISABLED, DISABLED);
-
-        // 3. 数据
-        var objFormData = new FormData(eleForm);
-        if (optionCallback.beforeSend) {
-            optionCallback.beforeSend.call(this, xhr, objFormData);
-        }
-        // 请求类型不同，数据地址也不一样
-        var strSearchParams = '';
-
-        if (strMethod.toLowerCase() == 'get') {
-            strSearchParams = new URLSearchParams(objFormData).toString();
-
-            if (strUrl.split('?').length > 1) {
-                strUrl = strUrl + '&' + strSearchParams;
-            } else {
-                strUrl = strUrl + '?' + strSearchParams;
-            }
-        }
-
-        // 4. 请求走起来
-        var xhr = new XMLHttpRequest();
-        xhr.open(strMethod, strUrl);
-
-        // 请求结束
-        xhr.onload = function () {
-            var json = {};
-
-            try {
-                json = JSON.parse(xhr.responseText);
-
-                if (json && (json.code == 0 || json.error == 0)) {
-                    // 成功回调
-                    if (optionCallback.success) {
-                        optionCallback.success.call(this, json);
-                    } else {
-                        // 如果没有成功回调，组件自己提示成功
-                        new LightTip().success(json.msg || '操作成功。');
-                    }
-                } else {
-                    new LightTip().error((json && json.msg) || '返回数据格式不符合要求。');
-
-                    // 失败回调
-                    if (optionCallback.error) {
-                        optionCallback.error.call(this, json);
-                    }
-                }
-            } catch (event) {
-                new LightTip().error(json.msg || '返回数据解析出错。');
-                // 回调
-                if (optionCallback.error) {
-                    optionCallback.error.call(this, event);
-                }
-            }
-
-            funLoadend(json);
-        }.bind(this);
-
-        // 请求错误
-        xhr.onerror = function () {
-            new LightTip().error('网络异常，刚才的操作没有成功，您可以稍后重试。');
-            // 回调
-            if (optionCallback.error) {
-                optionCallback.error.apply(this, arguments);
-            }
-
-            funLoadend();
-        }.bind(this);
-
-
-        // 请求结束，无论成功还是失败
-        // xhr.onloadend IE9不支持，因此这里使用
-        // 其他方法代替
-        var funLoadend = function () {
-            // 菊花关闭
-            eleButton.loading = false;
-            // 表单恢复提交
-            eleSubmit.removeAttribute(DISABLED);
-            // 回调
-            if (optionCallback.complete) {
-                optionCallback.complete.apply(this, arguments);
-            }
-        };
-
-        xhr.send(objFormData);
-    };
-
-    /**
-     * 执行表单的提交
-     * @return {Object} 返回当前实例对象
-     */
-    Form.prototype.submit = function () {
-        this.element.form.dispatchEvent(new CustomEvent('submit'));
-
-        return this;
-    };
-
-    return Form;
 }));
