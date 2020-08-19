@@ -1484,7 +1484,7 @@
             onSuccess: function () {}
         };
 
-        // //data属性
+        // data属性
         eleForm.querySelectorAll('input, select, textarea').forEach(function (eleInput) {
             var validateOption={};
             if(eleInput.getAttribute('data-remote-url')){
@@ -1496,13 +1496,35 @@
             if(eleInput.getAttribute('id')){
                 validateOption.id=eleInput.getAttribute('id');
             };
-            if(validateOption.id && validateOption.remoteUrl && validateOption.remoteQueryName){
+            var arrValidateKey = [
+                'badInput',
+                'customError',
+                'patternMismatch',
+                'rangeOverflow',
+                'rangeUnderflow',
+                'stepMismatch',
+                'tooLong',
+                'tooShort',
+                'typeMismatch',
+                'valueMissing'
+            ];
+            let dataCusReportExist=false;
+            for(let i=0; i<arrValidateKey.length; i++){
+                if(eleInput.getAttribute('data-report-'+arrValidateKey[i])){
+                    if(!validateOption.report)validateOption.report={};
+                    validateOption.report[arrValidateKey[i]]=eleInput.getAttribute('data-report-'+arrValidateKey[i]);
+                    dataCusReportExist=true;
+                };
+            }
+
+            if(validateOption.id && validateOption.remoteUrl && validateOption.remoteQueryName || dataCusReportExist){
                 let exist=false;
                 for(let i=0;i<options.validate.length;i++){
                     if(options.validate[i].id===validateOption.id){
                         exist=true;
                         options.validate[i].remoteUrl=validateOption.remoteUrl;
                         options.validate[i].remoteQueryName=validateOption.remoteQueryName;
+                        options.validate[i].report=Object.assign({},options.validate[i].report,dataCusReport)
                         break;
                     }
                 }
