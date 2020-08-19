@@ -3038,7 +3038,10 @@
                     // 这个与Datalist.js关联
                     !eleActiveTrigger.getAttribute('data-focus')
                 ) {
-                    return;
+                    //如果是验证元素，则隐藏提示
+                    if(eleActiveElement.validity.valid===undefined){
+                        return;
+                    }
                 }
                 (window.uniqueErrorTip || this).hide();
             }.bind(this));
@@ -10153,6 +10156,7 @@
 
             },
             requestRemoteValidate:function(element,submitTrigger){
+                var self=this;
                 element.pending=true;
                 // element.currentRequest= $.ajax({
                 //     url:element.customValidate.remoteUrl,
@@ -10214,11 +10218,13 @@
 
                         }else{
                             // create and dispatch the event
-                            var event = new CustomEvent("formCheckValidity", {
-                                'bubbles'    : true, // Whether the event will bubble up through the DOM or not
-                                'cancelable' : true
-                            });
-                            element.customValidate.owner.element.form.dispatchEvent(event);
+                            // var event = new CustomEvent("formCheckValidity", {
+                            //     'bubbles'    : true, // Whether the event will bubble up through the DOM or not
+                            //     'cancelable' : true
+                            // });
+                            // element.customValidate.owner.element.form.dispatchEvent(event);
+                            self.reportValidity(element);
+
                         }
 
                     }
@@ -11166,9 +11172,9 @@
         }.bind(this));
 
         //触发验证
-        eleForm.addEventListener("formCheckValidity", function (event) {
-            this.checkValidity();
-        }.bind(this));
+        // eleForm.addEventListener("formCheckValidity", function (event) {
+        //     this.checkValidity();
+        // }.bind(this));
 
 
 
