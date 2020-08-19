@@ -120,7 +120,10 @@
                     // 这个与Datalist.js关联
                     !eleActiveTrigger.getAttribute('data-focus')
                 ) {
-                    return;
+                    //如果是验证元素，则隐藏提示
+                    if(eleActiveElement.validity.valid===undefined){
+                        return;
+                    }
                 }
                 (window.uniqueErrorTip || this).hide();
             }.bind(this));
