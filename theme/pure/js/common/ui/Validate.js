@@ -1519,15 +1519,18 @@
 
             if(validateOption.id && validateOption.remoteUrl && validateOption.remoteQueryName || dataCusReportExist){
                 let exist=false;
-                for(let i=0;i<options.validate.length;i++){
-                    if(options.validate[i].id===validateOption.id){
-                        exist=true;
-                        options.validate[i].remoteUrl=validateOption.remoteUrl;
-                        options.validate[i].remoteQueryName=validateOption.remoteQueryName;
-                        options.validate[i].report=Object.assign({},options.validate[i].report,validateOption.report)
-                        break;
+                if(options.validate){
+                    for(let i=0;i<options.validate.length;i++){
+                        if(options.validate[i].id===validateOption.id){
+                            exist=true;
+                            options.validate[i].remoteUrl=validateOption.remoteUrl;
+                            options.validate[i].remoteQueryName=validateOption.remoteQueryName;
+                            options.validate[i].report=Object.assign({},options.validate[i].report,validateOption.report)
+                            break;
+                        }
                     }
                 }
+
                 if(!exist){
                     if(!options.validate){
                         options.validate=[];
