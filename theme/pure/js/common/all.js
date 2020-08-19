@@ -11157,7 +11157,7 @@
                         exist=true;
                         options.validate[i].remoteUrl=validateOption.remoteUrl;
                         options.validate[i].remoteQueryName=validateOption.remoteQueryName;
-                        options.validate[i].report=Object.assign({},options.validate[i].report,dataCusReport)
+                        options.validate[i].report=Object.assign({},options.validate[i].report,validateOption.report)
                         break;
                     }
                 }
