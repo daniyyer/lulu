@@ -1154,17 +1154,17 @@
                         var eleTargetRadio = this.getTarget(eleRadio);
 
                         if (valid) {
-                            eleTargetRadio.classList.remove('error');
+                            eleTargetRadio.classList.remove('error','is-invalid');
                             eleTargetRadio.removeAttribute('aria-label');
                         } else {
-                            eleTargetRadio.classList.add('error');
+                            eleTargetRadio.classList.add('error','is-invalid');
                         }
                     }.bind(this));
                 } else if (valid) {
-                    eleTarget.classList.remove('error');
+                    eleTarget.classList.remove('error','is-invalid');
                     eleTarget.removeAttribute('aria-label');
                 } else {
-                    eleTarget.classList.add('error');
+                    eleTarget.classList.add('error','is-invalid');
                 }
 
                 return valid;
@@ -1696,9 +1696,9 @@
 
                     // 超出范围或范围不足
                     if (length != 0 && (length > strAttrMaxLength || (strAttrMinLength && length < strAttrMinLength))) {
-                        eleMin.classList.add('error');
+                        eleMin.classList.add('error','is-invalid');
                     } else {
-                        eleMin.classList.remove('error');
+                        eleMin.classList.remove('error','is-invalid');
                     }
                 };
                 // 事件
