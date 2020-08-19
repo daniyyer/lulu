@@ -10123,7 +10123,7 @@
             // pending:{},
             getRemoteValidation:function(element){
                 var remoteInValid=false;
-                if(element.customValidate.remoteUrl && element.customValidate.remoteQueryName && element.value){
+                if(element.customValidate && element.customValidate.remoteUrl && element.customValidate.remoteQueryName && element.value){
                     if(element.pending===undefined){
                         remoteInValid=true;
                         //request
