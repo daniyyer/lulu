@@ -708,7 +708,8 @@
                 };
 
                 // 禁用元素不参与验证
-                if (!element || element.disabled) {
+                if (!element ) {
+                    // if (!element || element.disabled) {
                     return false;
                 }
 
@@ -825,7 +826,8 @@
                 };
 
                 // 是否数值或日期范围超出
-                if (!element || element.disabled) {
+                if (!element ) {
+                    // if (!element || element.disabled) {
                     return objValidateState;
                 }
 
@@ -922,7 +924,8 @@
                     tooShort: false
                 };
                 // 是否内容长度溢出的判断
-                if (!element || element.disabled || /^radio|checkbox|select$/i.test(element.type)) {
+                if (!element ||  /^radio|checkbox|select$/i.test(element.type)) {
+                // if (!element || element.disabled || /^radio|checkbox|select$/i.test(element.type)) {
                     return objValidateState;
                 }
 
@@ -1015,7 +1018,8 @@
             checkValidity: function (element) {
                 // 1. 元素不存在不验证
                 // 2. 禁用态表单元素不参与验证
-                if (!element || element.disabled) {
+                if (!element) {
+                // if (!element || element.disabled) {
                     return true;
                 }
 
