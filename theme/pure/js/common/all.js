@@ -10338,7 +10338,8 @@
                 };
 
                 // 禁用元素不参与验证
-                if (!element || element.disabled) {
+                if (!element ) {
+                    // if (!element || element.disabled) {
                     return false;
                 }
 
@@ -10455,7 +10456,8 @@
                 };
 
                 // 是否数值或日期范围超出
-                if (!element || element.disabled) {
+                if (!element ) {
+                    // if (!element || element.disabled) {
                     return objValidateState;
                 }
 
@@ -10552,7 +10554,8 @@
                     tooShort: false
                 };
                 // 是否内容长度溢出的判断
-                if (!element || element.disabled || /^radio|checkbox|select$/i.test(element.type)) {
+                if (!element ||  /^radio|checkbox|select$/i.test(element.type)) {
+                // if (!element || element.disabled || /^radio|checkbox|select$/i.test(element.type)) {
                     return objValidateState;
                 }
 
@@ -10645,7 +10648,8 @@
             checkValidity: function (element) {
                 // 1. 元素不存在不验证
                 // 2. 禁用态表单元素不参与验证
-                if (!element || element.disabled) {
+                if (!element) {
+                // if (!element || element.disabled) {
                     return true;
                 }
 
@@ -10784,17 +10788,17 @@
                         var eleTargetRadio = this.getTarget(eleRadio);
 
                         if (valid) {
-                            eleTargetRadio.classList.remove('error');
+                            eleTargetRadio.classList.remove('error','is-invalid');
                             eleTargetRadio.removeAttribute('aria-label');
                         } else {
-                            eleTargetRadio.classList.add('error');
+                            eleTargetRadio.classList.add('error','is-invalid');
                         }
                     }.bind(this));
                 } else if (valid) {
-                    eleTarget.classList.remove('error');
+                    eleTarget.classList.remove('error','is-invalid');
                     eleTarget.removeAttribute('aria-label');
                 } else {
-                    eleTarget.classList.add('error');
+                    eleTarget.classList.add('error','is-invalid');
                 }
 
                 return valid;
@@ -11326,9 +11330,9 @@
 
                     // 超出范围或范围不足
                     if (length != 0 && (length > strAttrMaxLength || (strAttrMinLength && length < strAttrMinLength))) {
-                        eleMin.classList.add('error');
+                        eleMin.classList.add('error','is-invalid');
                     } else {
-                        eleMin.classList.remove('error');
+                        eleMin.classList.remove('error','is-invalid');
                     }
                 };
                 // 事件
