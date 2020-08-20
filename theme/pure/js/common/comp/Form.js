@@ -59,7 +59,11 @@
     // 表单
     var Form = function (element, optionCallback, optionValidate) {
         if (typeof element == 'string') {
-            element = document.querySelector(element);
+            var elements = document.querySelectorAll(element);
+            for(var i=0;i<elements.length;i++){
+                new Form(elements[i],optionCallback,optionValidate);
+            }
+            return;
         }
         if (!element) {
             return this;
