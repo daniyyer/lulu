@@ -12099,7 +12099,7 @@
         // 通过submit按钮找到找到关联的我们肉眼所见的提交按钮
         var eleBtnSubmit = eleForm.querySelector('[type="submit"], [type="image"]');
         if (!eleBtnSubmit) {
-            eleBtnSubmit = eleForm.querySelector('button:nth-of-last-type()');
+            eleBtnSubmit = eleForm.querySelector('button:last-of-type');
         }
 
         if (!eleBtnSubmit) {
