@@ -1519,7 +1519,7 @@
 
             if(validateOption.id && validateOption.remoteUrl && validateOption.remoteQueryName || dataCusReportExist){
                 let exist=false;
-                if(options.validate){
+                if(options && options.validate){
                     for(let i=0;i<options.validate.length;i++){
                         if(options.validate[i].id===validateOption.id){
                             exist=true;
@@ -1532,6 +1532,7 @@
                 }
 
                 if(!exist){
+                    if(!options)options={};
                     if(!options.validate){
                         options.validate=[];
                     }
