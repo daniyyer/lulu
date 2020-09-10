@@ -10278,8 +10278,7 @@
                     return objValidateState;
                 }
                 // 有data-novalid-hidden属性的元素在隐藏时也不验证
-                var eleStyle = window.getComputedStyle(element);
-                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.hasAttribute("data-novalid-hidden")) {
+                if (!element.offsetParent && element.hasAttribute("data-novalid-hidden")) {
                     return objValidateState;
                 }
                 // 类型
@@ -10364,8 +10363,7 @@
                     return false;
                 }
                 // 有data-novalid-hidden属性的元素在隐藏时也不验证
-                var eleStyle = window.getComputedStyle(element);
-                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.getAttribute("data-novalid-hidden")) {
+                if (!element.offsetParent &&  element.getAttribute("data-novalid-hidden")) {
                     return false;
                 }
 
@@ -10487,8 +10485,7 @@
                     return objValidateState;
                 }
                 // 有data-novalid-hidden属性的元素在隐藏时也不验证
-                var eleStyle = window.getComputedStyle(element);
-                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.getAttribute("data-novalid-hidden")) {
+                if (!element.offsetParent &&  element.getAttribute("data-novalid-hidden")) {
                     return objValidateState;
                 }
                 // 类型和值
@@ -10590,8 +10587,7 @@
                 }
 
                 // 有data-novalid-hidden属性的元素在隐藏时也不验证
-                var eleStyle = window.getComputedStyle(element);
-                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.getAttribute("data-novalid-hidden")) {
+                if (!element.offsetParent &&  element.getAttribute("data-novalid-hidden")) {
                     return objValidateState;
                 }
 
@@ -10689,8 +10685,7 @@
                     return true;
                 }
                 // 有data-novalid-hidden属性的元素在隐藏时也不验证
-                var eleStyle = window.getComputedStyle(element);
-                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.hasAttribute("data-novalid-hidden")) {
+                if (!element.offsetParent &&  element.hasAttribute("data-novalid-hidden")) {
                     return true;
                 }
 
