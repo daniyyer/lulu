@@ -96,7 +96,12 @@
     // 表格
     var Table = function (element, options) {
         if (typeof element == 'string') {
-            element = document.querySelector(element);
+            // element = document.querySelector(element);
+            var elements = document.querySelectorAll(element);
+            for(var i=0;i<elements.length;i++){
+                new Form(elements[i],options);
+            }
+            return;
         }
 
         if (!element) {
