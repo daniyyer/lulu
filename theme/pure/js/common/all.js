@@ -10277,7 +10277,11 @@
                     // if (!element || element.disabled) {
                     return objValidateState;
                 }
-
+                // 有data-novalid-hidden属性的元素在隐藏时也不验证
+                var eleStyle = window.getComputedStyle(element);
+                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.hasAttribute("data-novalid-hidden")) {
+                    return objValidateState;
+                }
                 // 类型
                 var strType = this.getType(element);
 
@@ -10357,6 +10361,11 @@
                 // 禁用元素不参与验证
                 if (!element ) {
                     // if (!element || element.disabled) {
+                    return false;
+                }
+                // 有data-novalid-hidden属性的元素在隐藏时也不验证
+                var eleStyle = window.getComputedStyle(element);
+                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.getAttribute("data-novalid-hidden")) {
                     return false;
                 }
 
@@ -10477,7 +10486,11 @@
                     // if (!element || element.disabled) {
                     return objValidateState;
                 }
-
+                // 有data-novalid-hidden属性的元素在隐藏时也不验证
+                var eleStyle = window.getComputedStyle(element);
+                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.getAttribute("data-novalid-hidden")) {
+                    return objValidateState;
+                }
                 // 类型和值
                 var strType = this.getType(element);
                 var strValue = element.value.trim();
@@ -10576,6 +10589,12 @@
                     return objValidateState;
                 }
 
+                // 有data-novalid-hidden属性的元素在隐藏时也不验证
+                var eleStyle = window.getComputedStyle(element);
+                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.getAttribute("data-novalid-hidden")) {
+                    return objValidateState;
+                }
+
                 //  大小限制
                 var strAttrMinLenght = element.getAttribute('minlength');
                 var strAttrMaxLenght = element.maxlength || element.getAttribute('maxlength');
@@ -10667,6 +10686,11 @@
                 // 2. 禁用态表单元素不参与验证
                 if (!element) {
                 // if (!element || element.disabled) {
+                    return true;
+                }
+                // 有data-novalid-hidden属性的元素在隐藏时也不验证
+                var eleStyle = window.getComputedStyle(element);
+                if ((eleStyle.display == 'none' || eleStyle.visibility == 'hidden') && element.hasAttribute("data-novalid-hidden")) {
                     return true;
                 }
 
@@ -12384,7 +12408,12 @@
     // 表格
     var Table = function (element, options) {
         if (typeof element == 'string') {
-            element = document.querySelector(element);
+            // element = document.querySelector(element);
+            var elements = document.querySelectorAll(element);
+            for(var i=0;i<elements.length;i++){
+                new Form(elements[i],options);
+            }
+            return;
         }
 
         if (!element) {
