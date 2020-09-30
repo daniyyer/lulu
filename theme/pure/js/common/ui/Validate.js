@@ -1561,7 +1561,7 @@
         });
 
 
-        var objParams = Object.assign({}, defaults, options || {},);
+        var objParams = Object.assign({}, defaults, options || {});
         // console.log(objParams)
 
         // 还原禁用的提交和关闭按钮

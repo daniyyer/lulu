@@ -184,13 +184,13 @@
                 // 一开始的赋值
                 if (strInitValue == '') {
                     // 赋值今日
-                    if (strType == 'date') {
-                        eleInput.value = arrDate.join('-');
-                    } else if (strType == 'year') {
-                        eleInput.value = arrDate[0];
-                    } else if (strType == 'month') {
-                        eleInput.value = arrDate.slice(0, 2).join('-');
-                    }
+                    // if (strType == 'date') {
+                    //     eleInput.value = arrDate.join('-');
+                    // } else if (strType == 'year') {
+                    //     eleInput.value = arrDate[0];
+                    // } else if (strType == 'month') {
+                    //     eleInput.value = arrDate.slice(0, 2).join('-');
+                    // }
                 }
 
                 // eg. [2015,07,20]
