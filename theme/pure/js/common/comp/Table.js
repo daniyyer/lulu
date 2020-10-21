@@ -99,7 +99,7 @@
             // element = document.querySelector(element);
             var elements = document.querySelectorAll(element);
             for(var i=0;i<elements.length;i++){
-                new Form(elements[i],options);
+                new Table(elements[i],options);
             }
             return;
         }
