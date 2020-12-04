@@ -10032,8 +10032,8 @@
                     strFinalText = optionPrompt.rangeUnderflow || optionPrompt.rangeOverflow;
 
                     if (!strFinalText && strType && strName) {
-                        var strMin = element.getAttribute('min');
-                        var strMax = element.getAttribute('max');
+                        var strMin = element.getAttribute('data-val-range-min');
+                        var strMax = element.getAttribute('data-val-range-max');
 
                         if (strType == 'month-range') {
                             strMin = strMin.slice(0, 7);
@@ -10067,8 +10067,8 @@
                     strFinalText = optionPrompt.stepMismatch;
 
                     if (!strFinalText) {
-                        var numMin = element.getAttribute('min') * 1;
-                        var numMax = element.getAttribute('max') * 1;
+                        var numMin = element.getAttribute('data-val-range-min') * 1;
+                        var numMax = element.getAttribute('data-val-range-max') * 1;
                         var numStep = element.getAttribute('step') * 1 || 1;
 
                         if (strType == 'number' || strType == 'range') {
@@ -10106,7 +10106,7 @@
                         strFinalText = optionPrompt.tooLong;
 
                         if (!strFinalText) {
-                            var strMaxLength = element.maxlength || element.getAttribute('maxlength');
+                            var strMaxLength = element.maxlength || element.getAttribute('data-val-length-max');
 
                             strFinalText = (strName || '') + '内容长度不能大于' + strMaxLength.replace(/\D/g, '') + strTextCharLength;
                         }
@@ -10114,7 +10114,7 @@
                         // 先看看有没有自定义的提示
                         strFinalText = optionPrompt.tooShort;
                         if (!strFinalText) {
-                            var strMinLength = element.getAttribute('minlength');
+                            var strMinLength = element.getAttribute('data-val-minlength-min');
 
                             strFinalText = '内容长度不能小于' + strMinLength + strTextCharLength;
                         }
@@ -10240,8 +10240,26 @@
 
                     }
                 };
+                var remoteValue='';
+                var paramNames = element.customValidate.remoteQueryName.split(',');
+                for(var k=0;k<paramNames.length;k++){
+                    var paramData = paramNames[k].split('.');
+                    let paramName='';
+                    if (paramData.length == 1)
+                    {paramName = paramData[0];}
+                    else
+                    { paramName = paramData[1];}
+                    let paraVale="";
+                    if(document.getElementById(paramName)){
+                        paraVale=document.getElementById(paramName).value;
+                    }
+                    remoteValue=remoteValue+paramName+'='+paraVale+"&";
+                }
+                remoteValue=remoteValue.slice(0,-1);
 
-                element.currentXHR.open("GET", element.customValidate.remoteUrl+'?'+element.customValidate.remoteQueryName+'='+element.value, true);
+
+
+                element.currentXHR.open("GET", element.customValidate.remoteUrl+'?'+encodeURI(remoteValue), true);
                 element.currentXHR.send();
 
             },
@@ -10287,7 +10305,7 @@
                 // 此时的值才是准确的值（浏览器可能会忽略文本框中的值，例如number类型输入框中的不合法数值）
                 var strValue = element.value;
 
-                if (element.hasAttribute('required')) {
+                if (element.hasAttribute('data-val-required')) {
                     // 根据控件类型进行验证
                     // 1. 单复选框比较特殊，先处理下
                     if (strType == 'radio') {
@@ -10405,7 +10423,7 @@
                 // 获取正则表达式，pattern属性获取优先，然后通过type类型匹配。
                 // 注意，不处理为空的情况
                 regex = regex || (function () {
-                        return element.getAttribute('pattern');
+                        return element.getAttribute('data-val-regex-pattern');
                     })() ||
                     (function () {
                         // 文本框类型处理，可能有管道符——多类型重叠，如手机或邮箱
@@ -10443,7 +10461,7 @@
 
                 // 根据pattern判断类型
                 if (isAllPass == false) {
-                    if (element.hasAttribute('pattern')) {
+                    if (element.hasAttribute('data-val-regex-pattern')) {
                         objValidateState.patternMismatch = true;
                     } else {
                         objValidateState.typeMismatch = true;
@@ -10496,8 +10514,8 @@
                     return objValidateState;
                 }
 
-                var strAttrMin = element.getAttribute('min');
-                var strAttrMax = element.getAttribute('max');
+                var strAttrMin = element.getAttribute('data-val-range-min');
+                var strAttrMax = element.getAttribute('data-val-range-max');
                 var strAttrStep = Number(element.getAttribute('step')) || 1;
 
 
@@ -10592,8 +10610,8 @@
                 }
 
                 //  大小限制
-                var strAttrMinLenght = element.getAttribute('minlength');
-                var strAttrMaxLenght = element.maxlength || element.getAttribute('maxlength');
+                var strAttrMinLenght = element.getAttribute('data-val-minlength-min');
+                var strAttrMaxLenght = element.maxlength || element.getAttribute('data-val-length-max');
                 // 值
                 var strValue = element.value;
 
@@ -10928,7 +10946,7 @@
                         //     numRatioCh = 2;
                         // }
                         // 获得最大长度的索引位置
-                        var strAttrMaxLength = eleControl.maxlength || eleControl.getAttribute('maxlength').replace(/\D/g, '');
+                        var strAttrMaxLength = eleControl.maxlength || eleControl.getAttribute('data-val-length-max').replace(/\D/g, '');
 
                         if (numLength && strAttrMaxLength) {
                             document.validate.selectRange(element, document.validate.getLength(element, strAttrMaxLength), numLength);
@@ -11150,11 +11168,11 @@
         // data属性
         eleForm.querySelectorAll('input, select, textarea').forEach(function (eleInput) {
             var validateOption={};
-            if(eleInput.getAttribute('data-remote-url')){
-                validateOption.remoteUrl=eleInput.getAttribute('data-remote-url');
+            if(eleInput.getAttribute('data-val-remote-url')){
+                validateOption.remoteUrl=eleInput.getAttribute('data-val-remote-url');
             };
-            if(eleInput.getAttribute('data-remote-queryname')){
-                validateOption.remoteQueryName=eleInput.getAttribute('data-remote-queryname');
+            if(eleInput.getAttribute('data-val-remote-additionalfields')){
+                validateOption.remoteQueryName=eleInput.getAttribute('data-val-remote-additionalfields');
             };
             if(eleInput.getAttribute('id')){
                 validateOption.id=eleInput.getAttribute('id');
@@ -11318,7 +11336,7 @@
             // 遍历计数元素
             eleForm.querySelectorAll('input, textarea').forEach(function (element) {
                 // 对maxlength进行处理
-                var strAttrMaxLength = element.getAttribute('maxlength');
+                var strAttrMaxLength = element.getAttribute('data-val-length-max');
                 if (strAttrMaxLength) {
                     // 给maxlength设置不合法的值，阻止默认的长度限制
                     try {
@@ -11331,7 +11349,7 @@
                 }
 
                 // 获得限制大小
-                var strAttrMinLength = element.getAttribute('minlength');
+                var strAttrMinLength = element.getAttribute('data-val-minlength-min');
 
                 if (!strAttrMaxLength) {
                     return;
