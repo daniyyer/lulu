@@ -10123,7 +10123,7 @@
                     // 先看看有没有自定义的提示
                     strFinalText = optionPrompt.customError || defaultPrompt.customError;
                 }else if(objValidateState.remoteInValid){
-                    strFinalText=element.remoteResult
+                    strFinalText=element.remoteResult || "验证中..."
                 }
 
                 if (typeof strFinalText == 'function') {
